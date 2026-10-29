@@ -101,7 +101,7 @@ if (temSegundoPlano) {
           identifier: idAviso(slug),
           content: {
             title: `Bem-vindo à Casa Contente ${nome}!`,
-            body: 'Toque para ver o estoque desta loja e comprar pelo celular.',
+            body: 'Toque para ver os produtos desta loja e comprar pelo celular.',
             data: { loja: slug },
           },
           trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: PERMANENCIA_MS / 1000 },

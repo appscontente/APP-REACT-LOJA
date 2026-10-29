@@ -95,7 +95,7 @@ function OpcaoBoasVindas() {
     if (!quer) return desligar();
     Alert.alert(
       'Boas-vindas na loja',
-      'Quando você passar 2 minutos numa loja Casa Contente, o app dá as boas-vindas e já abre o estoque daquela loja. Para isso ele usa a localização do celular, que fica só no aparelho e não é guardada. Você pode desligar aqui quando quiser.',
+      'Quando você passar 2 minutos numa loja Casa Contente, o app dá as boas-vindas e já entra no modo daquela loja. Para isso ele usa a localização do celular, que fica só no aparelho e não é guardada. Você pode desligar aqui quando quiser.',
       [
         { text: 'Agora não', style: 'cancel' },
         {
@@ -113,7 +113,7 @@ function OpcaoBoasVindas() {
       <View style={{ flex: 1 }}>
         <Texto variante="forte">Boas-vindas na loja</Texto>
         <Texto variante="pequeno" cor={cores.textoSuave}>
-          Ao chegar numa loja, o app abre o estoque dela
+          Ao chegar numa loja, o app entra no modo dela
         </Texto>
       </View>
       <Switch
