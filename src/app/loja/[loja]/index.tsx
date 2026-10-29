@@ -64,13 +64,12 @@ export default function PortalLoja() {
                   </Texto>
                 </View>
               ) : null}
-              {loja.descontoAutoatendimento > 0 ? (
-                <View style={estilos.desconto}>
-                  <Texto variante="rotulo" cor={cores.sucesso}>
-                    Comprando sozinho pelo app você ganha {Math.round(loja.descontoAutoatendimento * 100)}% de desconto.
-                  </Texto>
-                </View>
-              ) : null}
+              <View style={estilos.desconto}>
+                <Texto variante="rotulo" cor={cores.sucesso}>
+                  Mega descontos no autoatendimento: comprando sozinho pelo app, o desconto aparece no carrinho conforme a
+                  forma de pagamento.
+                </Texto>
+              </View>
             </View>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <Botao
