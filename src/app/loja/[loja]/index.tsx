@@ -3,11 +3,12 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Botao } from '@/componentes/botao';
 import { CabecalhoLoja } from '@/componentes/cabecalho-loja';
+import { ComoFuncionaAutoatendimento } from '@/componentes/como-funciona-autoatendimento';
 import { Aviso, Carregando } from '@/componentes/estado-tela';
 import { GradeProdutos } from '@/componentes/grade-produtos';
 import { Texto } from '@/componentes/texto';
@@ -24,6 +25,7 @@ export default function PortalLoja() {
   const { iniciar } = useConversas();
   const loja = lojas.find((l) => l.slug === slug);
   const { dados, carregando, recarregar } = useDados(() => api.expostos(slug), [slug]);
+  const [comoFunciona, setComoFunciona] = useState(false);
 
   useEffect(() => {
     if (loja) entrar(loja.slug);
@@ -41,6 +43,7 @@ export default function PortalLoja() {
   return (
     <>
       <CabecalhoLoja loja={loja} />
+      <ComoFuncionaAutoatendimento visivel={comoFunciona} aoFechar={() => setComoFunciona(false)} aoComecar={() => setComoFunciona(false)} />
       <GradeProdutos
         produtos={dados ?? []}
         atualizando={carregando}
@@ -70,6 +73,7 @@ export default function PortalLoja() {
                   forma de pagamento.
                 </Texto>
               </View>
+              <Botao titulo="Como funciona o autoatendimento" variante="texto" onPress={() => setComoFunciona(true)} />
             </View>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <Botao

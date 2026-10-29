@@ -8,6 +8,7 @@ import { createContext, useContext, useEffect, useEffectEvent, useMemo, useRef, 
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { Botao } from '@/componentes/botao';
+import { ComoFuncionaAutoatendimento } from '@/componentes/como-funciona-autoatendimento';
 import { Sorriso } from '@/componentes/logo';
 import { Texto } from '@/componentes/texto';
 import { gravar, ler } from '@/lib/armazenamento';
@@ -29,6 +30,8 @@ import { cores, raio } from '@/lib/tema';
 import { useFigital } from './figital';
 
 const CHAVE = 'boas-vindas-ligado:v1';
+/** Na primeira chegada a uma loja, as boas-vindas apresentam o autoatendimento; depois, só o cartão curto. */
+const CHAVE_APRESENTADO = 'autoatendimento-apresentado:v1';
 /** Sem andar, o celular não manda posição nova; a conta dos 2 minutos roda nesse intervalo. */
 const CONFERIR_MS = 15 * 1000;
 
@@ -51,21 +54,31 @@ export function ProvedorBoasVindas({ children }: { children: ReactNode }) {
   const [ligado, setLigado] = useState(false);
   const [comAppFechado, setComAppFechado] = useState(false);
   const [saudacao, setSaudacao] = useState<LojaNoMapa>();
+  const [apresentacao, setApresentacao] = useState<{ slug: string; nome?: string }>();
   const chegadas = useRef(new Map<string, number>());
-  // Entrar na loja muda o modo loja; não pode reiniciar o acompanhamento da posição.
-  const entrarNaLoja = useEffectEvent(entrar);
 
   useEffect(() => {
     ler<boolean>(CHAVE, false).then(setLigado);
   }, []);
+
+  const saudar = useEffectEvent(async (loja: { slug: string; nome?: string }, abrirLoja: boolean) => {
+    entrar(loja.slug);
+    const nome = loja.nome ?? lojas.find((l) => l.slug === loja.slug)?.nome;
+    if (!(await ler<boolean>(CHAVE_APRESENTADO, false))) {
+      gravar(CHAVE_APRESENTADO, true);
+      setApresentacao({ slug: loja.slug, nome });
+      return;
+    }
+    if (abrirLoja) router.push(rotaLoja(loja.slug) as never);
+    else if (loja.nome) setSaudacao(loja as LojaNoMapa);
+  });
 
   // Tocar no aviso de boas-vindas abre a loja e entra no modo dela.
   useEffect(() => {
     const abrir = (r: Notifications.NotificationResponse | null) => {
       const slug = r?.notification.request.content.data?.loja;
       if (typeof slug !== 'string') return;
-      entrarNaLoja(slug);
-      router.push(rotaLoja(slug) as never);
+      saudar({ slug }, true);
     };
     abrir(Notifications.getLastNotificationResponse());
     const assinatura = Notifications.addNotificationResponseReceivedListener(abrir);
@@ -90,8 +103,7 @@ export function ProvedorBoasVindas({ children }: { children: ReactNode }) {
           else if (Date.now() - chegou >= PERMANENCIA_MS && !(await jaSaudou(loja.slug)) && ativo) {
             await marcarSaudada(loja.slug);
             await Notifications.cancelScheduledNotificationAsync(`boas-vindas-${loja.slug}`).catch(() => undefined);
-            entrarNaLoja(loja.slug);
-            setSaudacao(loja);
+            saudar(loja, false);
           }
         } else if (d > RAIO_M * 1.5) {
           // Folga na saída, para o GPS oscilando na porta não zerar a conta.
@@ -170,6 +182,16 @@ export function ProvedorBoasVindas({ children }: { children: ReactNode }) {
           <Botao titulo="Agora não" variante="texto" onPress={() => setSaudacao(undefined)} />
         </View>
       </Modal>
+      <ComoFuncionaAutoatendimento
+        visivel={Boolean(apresentacao)}
+        nomeLoja={apresentacao?.nome ?? ''}
+        aoFechar={() => setApresentacao(undefined)}
+        aoComecar={() => {
+          const slug = apresentacao?.slug;
+          setApresentacao(undefined);
+          if (slug) router.push(rotaLoja(slug) as never);
+        }}
+      />
     </ContextoBoasVindas.Provider>
   );
 }
