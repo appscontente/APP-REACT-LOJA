@@ -77,10 +77,18 @@ export type LojaFisica = {
   horasReserva: number;
 };
 
+/** De onde sai a mercadoria na Figital: CD (empresa 7), a própria loja ou outra loja. */
+export type OrigemSaida = 'cd' | 'loja' | 'outra-loja';
+
+/**
+ * Solução de compra na loja (o cliente não vê quantidades). `disponivel` é só o limite do carrinho. Com `aviso`, a loja
+ * tem uma peça só, que pode ser a de mostruário: o cliente aceita ou escolhe a `alternativa` (CD ou outra loja).
+ */
 export type OrigemEstoque = {
-  origem?: 'cd' | 'loja';
+  origem?: OrigemSaida;
   disponivel: number;
-  aviso?: 'estoque-loja' | 'ultima-peca';
+  aviso?: 'peca-unica';
+  alternativa?: { origem: Exclude<OrigemSaida, 'loja'>; disponivel: number };
 };
 
 export type ProdutoFigital = {
