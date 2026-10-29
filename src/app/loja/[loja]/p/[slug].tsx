@@ -19,7 +19,7 @@ import { useCarrinho } from '@/estado/carrinho';
 import { useConversas } from '@/estado/conversas';
 import { useFigital } from '@/estado/figital';
 import { api } from '@/lib/api';
-import { nomeLegivel } from '@/lib/formatar';
+import { arredondar, formatarPreco, nomeLegivel } from '@/lib/formatar';
 import { rotaCarrinhoLoja } from '@/lib/rotas';
 import { cores, raio } from '@/lib/tema';
 import { useDados } from '@/lib/use-dados';
@@ -32,6 +32,8 @@ const TEXTO_SAIDA = {
   'outra-loja': 'Disponível para levar: sai de outra loja Casa Contente, com entrega ou retirada.',
   'peca-unica': 'Peça única nesta loja: pode ser a de mostruário. Na hora de pôr no carrinho, você escolhe.',
 };
+
+const pct = (n: number) => n.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
 
 const OUTRO_LUGAR = { cd: 'Sair do centro de distribuição', 'outra-loja': 'Sair de outra loja' };
 
@@ -62,11 +64,19 @@ export default function ProdutoNaLoja() {
   const { iniciar } = useConversas();
   const loja = lojas.find((l) => l.slug === slugLoja);
   const { dados, erro, carregando, recarregar } = useDados(() => api.produtoNaLoja(slugLoja, { slug }), [slugLoja, slug]);
+  const codprod = dados?.produto.codprod;
+  const { dados: descontos } = useDados(
+    () => (codprod ? api.descontos(slugLoja, [codprod]) : Promise.resolve({ itens: [] })),
+    [slugLoja, codprod],
+  );
 
   if (!loja || (!dados && carregando)) return <Carregando />;
   if (!dados) return <Erro mensagem={erro ?? ''} tentar={recarregar} />;
   const { produto: p, origem } = dados;
   const nome = nomeLegivel(p.nome);
+  const tabela = descontos?.itens.find((d) => d.codprod === p.codprod);
+  const pixCaixa = tabela?.descontos.pix?.caixa ?? 0;
+  const melhor = tabela ? Math.max(0, ...Object.values(tabela.descontos).map((d) => d.caixa)) : 0;
   const item = { ...p, imagem: p.imagens[0]?.src, estoque: origem.disponivel, origemEstoque: origem.origem };
   // Já no carrinho: a escolha (mostruário ou outro lugar) foi feita na primeira vez.
   const jaNoCarrinho = itens(loja.slug).some((i) => i.codprod === p.codprod);
@@ -100,6 +110,15 @@ export default function ProdutoNaLoja() {
           </Texto>
           <Texto variante="titulo">{nome}</Texto>
           <Preco preco={p.preco} precoDe={p.precoDe} descontoPix={p.descontoPix} tamanho="pagina" />
+          {pixCaixa > 0 ? (
+            <View style={estilos.autoatendimento}>
+              <Texto variante="forte">{formatarPreco(arredondar(p.preco * (1 - pixCaixa / 100)))} no autoatendimento, no Pix</Texto>
+              <Texto variante="pequeno" cor={cores.textoSuave}>
+                {pct(pixCaixa)}% a menos pagando no caixa no Pix ou em dinheiro
+                {melhor > pixCaixa ? ` (até ${pct(melhor)}% conforme o pagamento)` : ''}. No crédito, o desconto muda com as parcelas.
+              </Texto>
+            </View>
+          ) : null}
           <View style={estilos.saida}>
             <Ionicons
               name={origem.aviso ? 'information-circle' : origem.origem === 'loja' ? 'storefront-outline' : 'cube-outline'}
@@ -141,6 +160,7 @@ export default function ProdutoNaLoja() {
 
 const estilos = StyleSheet.create({
   corpo: { padding: 16, gap: 12 },
+  autoatendimento: { gap: 2, padding: 12, borderRadius: raio.m, backgroundColor: cores.creme },
   saida: { flexDirection: 'row', gap: 8, padding: 12, borderRadius: raio.m, backgroundColor: cores.superficie, borderWidth: 1, borderColor: cores.borda },
   semDescricao: { gap: 12, padding: 16, borderRadius: raio.l, backgroundColor: cores.creme },
 });

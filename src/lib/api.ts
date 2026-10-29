@@ -4,6 +4,7 @@
 
 import type {
   CardProduto,
+  DescontoFigital,
   Departamento,
   Exposto,
   Inicio,
@@ -66,6 +67,9 @@ export const api = {
   produtoNaLoja: (loja: string, por: { slug?: string; codprod?: string }) =>
     obter<ProdutoFigital>(`/api/app/lojas/${encodeURIComponent(loja)}/produtos`, por),
   expostos: (loja: string) => obter<Exposto[]>(`/api/app/lojas/${encodeURIComponent(loja)}/expostos`),
+  /** Desconto do autoatendimento (Happy) de cada item em cada forma de pagamento; sem resposta, sem desconto. */
+  descontos: (loja: string, codprods: string[]) =>
+    obter<{ itens: DescontoFigital[] }>(`/api/app/lojas/${encodeURIComponent(loja)}/descontos`, { itens: codprods.join(',') }),
 };
 
 /** Imagem do site com endereço completo (as rotas do app já mandam assim; isto cobre o "sem foto"). */

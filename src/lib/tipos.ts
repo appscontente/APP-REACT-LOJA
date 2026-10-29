@@ -91,6 +91,17 @@ export type OrigemEstoque = {
   alternativa?: { origem: Exclude<OrigemSaida, 'loja'>; disponivel: number };
 };
 
+/** Desconto do autoatendimento (Happy), por item e por forma de pagamento: pix, debito e crédito de 1 a 10x. */
+export const PAGAMENTOS_FIGITAL = ['pix', 'debito', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] as const;
+export type PagamentoFigital = (typeof PAGAMENTOS_FIGITAL)[number];
+export type DescontoFigital = {
+  codprod: string;
+  linha: 'moveis' | 'eletro';
+  motivo: 'promocao' | 'conjunto' | 'sem_custo' | null;
+  /** `site` = % pagando pelo app/site; `caixa` = % finalizando no caixa. */
+  descontos: Record<PagamentoFigital, { site: number; caixa: number }>;
+};
+
 export type ProdutoFigital = {
   produto: Produto;
   estoqueCD: number;
