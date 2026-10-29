@@ -26,6 +26,17 @@ export function ItemCarrinho({ item, destino = 'site' }: { item: Item; destino?:
             Peça de exposição: a loja confirma antes da cobrança
           </Texto>
         ) : null}
+        {destino !== 'site' ? (
+          <Texto variante="pequeno" cor={item.mostruario ? cores.aviso : cores.textoSuave}>
+            {item.mostruario
+              ? 'Peça de mostruário desta loja'
+              : item.origemEstoque === 'loja'
+                ? 'Sai da loja'
+                : item.origemEstoque === 'outra-loja'
+                  ? 'Sai de outra loja'
+                  : 'Sai do centro de distribuição'}
+          </Texto>
+        ) : null}
         <Texto variante="forte">{formatarPreco(item.preco * item.quantidade)}</Texto>
         <View style={estilos.acoes}>
           <View style={estilos.quantidade}>

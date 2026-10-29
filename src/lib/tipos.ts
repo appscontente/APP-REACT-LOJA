@@ -77,10 +77,29 @@ export type LojaFisica = {
   horasReserva: number;
 };
 
+/** De onde sai a mercadoria na Figital: CD (empresa 7), a própria loja ou outra loja. */
+export type OrigemSaida = 'cd' | 'loja' | 'outra-loja';
+
+/**
+ * Solução de compra na loja (o cliente não vê quantidades). `disponivel` é só o limite do carrinho. Com `aviso`, a loja
+ * tem uma peça só, que pode ser a de mostruário: o cliente aceita ou escolhe a `alternativa` (CD ou outra loja).
+ */
 export type OrigemEstoque = {
-  origem?: 'cd' | 'loja';
+  origem?: OrigemSaida;
   disponivel: number;
-  aviso?: 'estoque-loja' | 'ultima-peca';
+  aviso?: 'peca-unica';
+  alternativa?: { origem: Exclude<OrigemSaida, 'loja'>; disponivel: number };
+};
+
+/** Desconto do autoatendimento (Happy), por item e por forma de pagamento: pix, debito e crédito de 1 a 10x. */
+export const PAGAMENTOS_FIGITAL = ['pix', 'debito', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'] as const;
+export type PagamentoFigital = (typeof PAGAMENTOS_FIGITAL)[number];
+export type DescontoFigital = {
+  codprod: string;
+  linha: 'moveis' | 'eletro';
+  motivo: 'promocao' | 'conjunto' | 'sem_custo' | null;
+  /** `site` = % pagando pelo app/site; `caixa` = % finalizando no caixa. */
+  descontos: Record<PagamentoFigital, { site: number; caixa: number }>;
 };
 
 export type ProdutoFigital = {

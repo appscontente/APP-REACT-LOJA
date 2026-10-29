@@ -5,12 +5,18 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 
 import { gravar, ler } from '@/lib/armazenamento';
 import { DESCONTO_PIX, arredondar } from '@/lib/formatar';
-import type { CardProduto } from '@/lib/tipos';
+import type { CardProduto, OrigemSaida } from '@/lib/tipos';
 
 export type ItemCarrinho = Pick<
   CardProduto,
   'codprod' | 'slug' | 'nome' | 'marca' | 'preco' | 'precoDe' | 'descontoPix' | 'imagem' | 'sujeitoConfirmacao'
-> & { quantidade: number; estoque: number };
+> & {
+  quantidade: number;
+  estoque: number;
+  /** Figital: de onde sai a peça e se o cliente aceitou a de mostruário (peça única na loja). */
+  origemEstoque?: OrigemSaida;
+  mostruario?: boolean;
+};
 
 /** "site" ou o slug da loja (carrinho da Figital). */
 export type Destino = 'site' | string;
