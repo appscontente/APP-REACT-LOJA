@@ -4,12 +4,13 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Botao } from '@/componentes/botao';
 import { Sorriso } from '@/componentes/logo';
 import { Texto } from '@/componentes/texto';
+import { useBoasVindas } from '@/estado/boas-vindas';
 import { useConta } from '@/estado/conta';
 import { useConversas } from '@/estado/conversas';
 import { cores, fontes, raio } from '@/lib/tema';
@@ -87,6 +88,45 @@ function Opcao({ icone, titulo, texto, aoTocar, contador }: { icone: React.Compo
   );
 }
 
+/** Liga as boas-vindas na loja. Explica antes de o celular pedir a permissão de localização. */
+function OpcaoBoasVindas() {
+  const { ligado, ligar, desligar } = useBoasVindas();
+  const alternar = (quer: boolean) => {
+    if (!quer) return desligar();
+    Alert.alert(
+      'Boas-vindas na loja',
+      'Quando você passar 2 minutos numa loja Casa Contente, o app dá as boas-vindas e já abre o estoque daquela loja. Para isso ele usa a localização do celular, que fica só no aparelho e não é guardada. Você pode desligar aqui quando quiser.',
+      [
+        { text: 'Agora não', style: 'cancel' },
+        {
+          text: 'Ligar',
+          onPress: async () => {
+            if (!(await ligar())) Alert.alert('Sem localização', 'Para ligar, permita a localização do app nos ajustes do celular.');
+          },
+        },
+      ],
+    );
+  };
+  return (
+    <View style={estilos.opcao}>
+      <Ionicons name="location-outline" size={22} color={cores.marca} />
+      <View style={{ flex: 1 }}>
+        <Texto variante="forte">Boas-vindas na loja</Texto>
+        <Texto variante="pequeno" cor={cores.textoSuave}>
+          Ao chegar numa loja, o app abre o estoque dela
+        </Texto>
+      </View>
+      <Switch
+        value={ligado}
+        onValueChange={alternar}
+        trackColor={{ true: cores.marca, false: cores.borda }}
+        thumbColor="#fff"
+        accessibilityLabel="Boas-vindas na loja"
+      />
+    </View>
+  );
+}
+
 export default function Conta() {
   const topo = useSafeAreaInsets().top;
   const { logado, email, pedidos, favoritos, sair } = useConta();
@@ -107,6 +147,7 @@ export default function Conta() {
       </View>
       <View style={estilos.grupo}>
         <Opcao icone="storefront-outline" titulo="Nossas lojas" texto="Endereços e horários" aoTocar={() => router.push('/lojas')} />
+        <OpcaoBoasVindas />
         <Opcao icone="shield-checkmark-outline" titulo="Privacidade" texto="Seus dados, avisos e excluir conta" aoTocar={() => router.push('/privacidade')} />
       </View>
       {logado && <Botao titulo="Sair da conta" variante="contorno" onPress={sair} />}
