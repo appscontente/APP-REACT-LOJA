@@ -13,8 +13,8 @@ import { Texto } from './texto';
 const PASSOS: { icone: React.ComponentProps<typeof Ionicons>['name']; titulo: string; texto: string }[] = [
   {
     icone: 'qr-code-outline',
-    titulo: 'Leia a etiqueta',
-    texto: 'Toque em "Ler etiqueta" e aponte a câmera para o QR do produto. Aparecem o preço, as fotos e os detalhes.',
+    titulo: 'Leia o QR code ou procure o produto',
+    texto: 'Leia o QR code da etiqueta ou procure pelo produto que deseja ver aqui na loja. Aparecem o preço, as fotos e os detalhes.',
   },
   {
     icone: 'cart-outline',

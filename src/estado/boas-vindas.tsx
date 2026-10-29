@@ -169,7 +169,7 @@ export function ProvedorBoasVindas({ children }: { children: ReactNode }) {
             Bem-vindo à Casa Contente {saudacao?.nome}!
           </Texto>
           <Texto cor={cores.textoSuave} style={{ textAlign: 'center' }}>
-            O app já está no modo desta loja: leia o QR da etiqueta para ver o preço e comprar pelo celular.
+            O app já está no modo desta loja: leia o QR code ou procure pelo produto que deseja ver aqui na loja.
           </Texto>
           <Botao
             titulo="Ver a loja"
