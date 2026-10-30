@@ -192,7 +192,8 @@ export default function Checkout() {
       total,
       forma: dividido ? 'cartao-pix' : forma,
       entrega,
-      loja,
+      // Loja do pedido: a da retirada ou, entrega pedida dentro de uma loja, a loja onde o cliente estava.
+      loja: entrega === 'retirada' ? loja : daLoja,
       situacao: forma === 'pix' ? 'aguardando-pix' : 'em-analise',
     });
     if (!conta.logado) conta.entrar(email.trim().toLowerCase(), nome.trim());
