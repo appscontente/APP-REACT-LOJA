@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useConta } from '@/estado/conta';
@@ -54,28 +54,31 @@ export function GavetaCep({ aberta, fechar }: { aberta: boolean; fechar: () => v
   const valido = valor.replace(/\D/g, '').length === 8;
   return (
     <Modal visible={aberta} transparent animationType="slide" onRequestClose={fechar}>
-      <Pressable style={estilos.fundo} onPress={fechar} />
-      <View style={estilos.gaveta}>
-        <Texto variante="subtitulo">Onde você quer receber?</Texto>
-        <Texto cor={cores.textoSuave}>Com o CEP mostramos o frete e o prazo de cada produto.</Texto>
-        <TextInput
-          value={formatarCep(valor)}
-          onChangeText={setValor}
-          keyboardType="number-pad"
-          placeholder="00000-000"
-          maxLength={9}
-          style={estilos.entrada}
-          autoFocus
-        />
-        <Botao
-          titulo="Usar este CEP"
-          disabled={!valido}
-          onPress={() => {
-            definirCep(valor.replace(/\D/g, ''));
-            fechar();
-          }}
-        />
-      </View>
+      {/* A gaveta sobe junto com o teclado, para o campo e o botão ficarem à vista. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <Pressable style={estilos.fundo} onPress={fechar} />
+        <View style={estilos.gaveta}>
+          <Texto variante="subtitulo">Onde você quer receber?</Texto>
+          <Texto cor={cores.textoSuave}>Com o CEP mostramos o frete e o prazo de cada produto.</Texto>
+          <TextInput
+            value={formatarCep(valor)}
+            onChangeText={setValor}
+            keyboardType="number-pad"
+            placeholder="00000-000"
+            maxLength={9}
+            style={estilos.entrada}
+            autoFocus
+          />
+          <Botao
+            titulo="Usar este CEP"
+            disabled={!valido}
+            onPress={() => {
+              definirCep(valor.replace(/\D/g, ''));
+              fechar();
+            }}
+          />
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

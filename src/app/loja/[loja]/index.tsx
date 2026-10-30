@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Botao } from '@/componentes/botao';
-import { CabecalhoLoja } from '@/componentes/cabecalho-loja';
+import { BotaoSairDaLoja, CabecalhoLoja } from '@/componentes/cabecalho-loja';
 import { ComoFuncionaAutoatendimento } from '@/componentes/como-funciona-autoatendimento';
 import { Aviso, Carregando } from '@/componentes/estado-tela';
 import { GradeProdutos } from '@/componentes/grade-produtos';
@@ -80,6 +80,7 @@ export default function PortalLoja() {
                 </Texto>
               </View>
               <Botao titulo="Como funciona o autoatendimento" variante="texto" onPress={() => setComoFunciona(true)} />
+              <BotaoSairDaLoja />
             </View>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <Botao

@@ -3,15 +3,15 @@ import { router, Stack } from 'expo-router';
 import { Platform, Pressable, View } from 'react-native';
 
 import { useCarrinho } from '@/estado/carrinho';
-import { useFigital } from '@/estado/figital';
 import { rotaCarrinhoLoja } from '@/lib/rotas';
 import { cores, fontes } from '@/lib/tema';
 import type { LojaFisica } from '@/lib/tipos';
+import { useFigital } from '@/estado/figital';
+import { Botao } from './botao';
 import { Texto } from './texto';
 
-/** No modo loja o topo fica amarelo com o nome da loja, o carrinho da loja e "Sair". */
+/** No modo loja o topo fica amarelo com o nome da loja e o carrinho da loja. Sair da loja fica separado (BotaoSairDaLoja). */
 export function CabecalhoLoja({ loja, titulo }: { loja: LojaFisica; titulo?: string }) {
-  const { sair } = useFigital();
   const quantidade = useCarrinho().quantidadeTotal(loja.slug);
   return (
     <Stack.Screen
@@ -31,18 +31,24 @@ export function CabecalhoLoja({ loja, titulo }: { loja: LojaFisica; titulo?: str
                 </View>
               ) : null}
             </Pressable>
-            <Pressable
-              onPress={() => {
-                sair();
-                router.replace('/');
-              }}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Sair da loja">
-              <Ionicons name="exit-outline" size={24} color={cores.texto} />
-            </Pressable>
           </View>
         ),
+      }}
+    />
+  );
+}
+
+/** Volta para a loja geral (sai do modo loja). Fica longe do carrinho, para ninguém tocar sem querer. */
+export function BotaoSairDaLoja() {
+  const { sair } = useFigital();
+  return (
+    <Botao
+      titulo="Voltar para a loja geral"
+      variante="contorno"
+      icone={<Ionicons name="exit-outline" size={18} color={cores.marca} />}
+      onPress={() => {
+        sair();
+        router.replace('/');
       }}
     />
   );

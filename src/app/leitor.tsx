@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Botao } from '@/componentes/botao';
@@ -64,15 +64,17 @@ export default function Leitor() {
         )}
         {permissao?.granted ? <View style={estilos.mira} pointerEvents="none" /> : null}
       </View>
-      <View style={[estilos.manual, { paddingBottom: insets.bottom + 16 }]}>
-        <Texto variante="pequeno" cor={cores.textoSuave}>
-          {lojaAtual ? `Na loja ${lojaAtual.nome}: digite o código da etiqueta.` : 'Ou digite o código da etiqueta ou do produto.'}
-        </Texto>
-        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-end' }}>
-          <Campo rotulo="Código" value={codigo} onChangeText={setCodigo} autoCapitalize="characters" onSubmitEditing={() => abrir(codigo)} />
-          <Botao titulo="Abrir" onPress={() => abrir(codigo)} disabled={!codigo.trim()} />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={[estilos.manual, { paddingBottom: insets.bottom + 16 }]}>
+          <Texto variante="pequeno" cor={cores.textoSuave}>
+            {lojaAtual ? `Na loja ${lojaAtual.nome}: digite o código da etiqueta.` : 'Ou digite o código da etiqueta ou do produto.'}
+          </Texto>
+          <View style={{ flexDirection: 'row', gap: 10, alignItems: 'flex-end' }}>
+            <Campo rotulo="Código" value={codigo} onChangeText={setCodigo} autoCapitalize="characters" onSubmitEditing={() => abrir(codigo)} />
+            <Botao titulo="Abrir" onPress={() => abrir(codigo)} disabled={!codigo.trim()} />
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }

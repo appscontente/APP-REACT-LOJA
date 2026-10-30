@@ -132,7 +132,7 @@ export default function Conta() {
   const { logado, email, pedidos, favoritos, sair } = useConta();
   const { naoLidas } = useConversas();
   return (
-    <ScrollView style={estilos.tela} contentContainerStyle={[estilos.conteudo, { paddingTop: topo + 12 }]}>
+    <ScrollView style={estilos.tela} contentContainerStyle={[estilos.conteudo, { paddingTop: topo + 12 }]} automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled">
       <View style={estilos.ola}>
         <Sorriso largura={44} />
         <Texto variante="titulo">{logado ? 'Olá!' : 'Minha conta'}</Texto>

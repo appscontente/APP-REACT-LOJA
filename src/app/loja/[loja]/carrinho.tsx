@@ -10,7 +10,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 import { Botao } from '@/componentes/botao';
-import { CabecalhoLoja } from '@/componentes/cabecalho-loja';
+import { BotaoSairDaLoja, CabecalhoLoja } from '@/componentes/cabecalho-loja';
 import { Campo } from '@/componentes/campo';
 import { Aviso, Carregando } from '@/componentes/estado-tela';
 import { ItemCarrinho } from '@/componentes/item-carrinho';
@@ -42,7 +42,7 @@ type Comprovante = { numero: string; expiraEm: string; total: number; itens: { n
 export default function CarrinhoLoja() {
   const { loja: slug } = useLocalSearchParams<{ loja: string }>();
   const { lojas } = useFigital();
-  const { itens, esvaziar, adicionar } = useCarrinho();
+  const { itens, esvaziar } = useCarrinho();
   const [nome, setNome] = useState('');
   const [cpf, setCpf] = useState('');
   const [comprovante, setComprovante] = useState<Comprovante>();
@@ -95,7 +95,7 @@ export default function CarrinhoLoja() {
   const pronto = nome.trim().length > 2 && cpf.replace(/\D/g, '').length === 11;
 
   return (
-    <ScrollView contentContainerStyle={estilos.conteudo} keyboardShouldPersistTaps="handled">
+    <ScrollView contentContainerStyle={estilos.conteudo} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive">
       <CabecalhoLoja loja={loja} titulo="Carrinho da loja" />
       {lista.map((i) => (
         <ItemCarrinho key={i.codprod} item={i} destino={loja.slug} />
@@ -163,12 +163,10 @@ export default function CarrinhoLoja() {
       <Botao
         titulo="Concluir pelo app (entrega ou retirada)"
         variante="texto"
-        onPress={() => {
-          lista.forEach(({ quantidade, ...i }) => adicionar(i, 'site', quantidade));
-          esvaziar(loja.slug);
-          router.push('/checkout');
-        }}
+        // Os itens continuam no carrinho da loja: se o cliente voltar, ainda pode finalizar no caixa.
+        onPress={() => router.push({ pathname: '/checkout', params: { loja: loja.slug } })}
       />
+      <BotaoSairDaLoja />
     </ScrollView>
   );
 }
