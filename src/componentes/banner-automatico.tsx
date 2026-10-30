@@ -21,7 +21,8 @@ export function BannerAutomatico({ banner, largura, formato }: { banner: Dados; 
   const { produto: p, modelo } = banner;
   const oferta = modelo === 'oferta';
   const tinta = oferta ? '#fff' : cores.texto;
-  const altura = formato === 'carrossel' ? largura * 0.9 : largura * 0.58;
+  const fixo = formato === 'fixo';
+  const altura = fixo ? largura * 0.58 : largura * 0.9;
   const parcelas = calcularParcelas(p.preco);
   const nome = nomeLegivel(p.nome);
   return (
@@ -37,10 +38,7 @@ export function BannerAutomatico({ banner, largura, formato }: { banner: Dados; 
           { backgroundColor: oferta ? cores.marcaEscura : 'rgba(253,185,23,0.18)' },
         ]}
       />
-      <View style={[estilos.sorriso, { opacity: oferta ? 0.5 : 1 }]}>
-        <Sorriso largura={largura * 0.28} cor={oferta ? cores.sorriso : cores.marca} />
-      </View>
-      <View style={[estilos.vitrine, { width: largura * 0.52, height: altura * 0.86 }]}>
+      <View style={[estilos.vitrine, { width: largura * 0.48, height: altura * 0.86 }]}>
         <View
           style={[
             estilos.disco,
@@ -55,15 +53,21 @@ export function BannerAutomatico({ banner, largura, formato }: { banner: Dados; 
           <Texto style={[estilos.seloOff, { fontSize: largura * 0.028 }]}>OFF</Texto>
         </View>
       )}
-      <View style={[estilos.coluna, { width: largura * 0.5 }]}>
+      {/* Texto numa coluna própria à esquerda, sem nada por cima: o sorriso fica pequeno acima do título. */}
+      <View style={[estilos.coluna, { width: largura * 0.5 - 18 }]}>
         <View style={{ gap: 4 }}>
+          <Sorriso largura={36} cor={oferta ? cores.sorriso : cores.marca} />
           <Texto style={[estilos.olho, { color: oferta ? cores.sorriso : cores.marca }]}>{TEXTOS[modelo].olho}</Texto>
-          <Texto numberOfLines={3} style={[estilos.nome, { color: tinta, fontSize: nome.length > 30 ? 18 : 22 }]}>
+          <Texto
+            numberOfLines={fixo ? 2 : 3}
+            style={[estilos.nome, { color: tinta, fontSize: fixo || nome.length > 30 ? 17 : 22, lineHeight: fixo || nome.length > 30 ? 21 : 26 }]}>
             {nome}
           </Texto>
-          <Texto variante="pequeno" cor={oferta ? 'rgba(255,255,255,0.8)' : cores.textoSuave}>
-            {p.marca}
-          </Texto>
+          {!fixo && p.marca ? (
+            <Texto variante="pequeno" numberOfLines={1} cor={oferta ? 'rgba(255,255,255,0.8)' : cores.textoSuave}>
+              {p.marca}
+            </Texto>
+          ) : null}
         </View>
         <View style={{ gap: 2 }}>
           {p.precoDe && p.precoDe > p.preco ? (
@@ -77,7 +81,7 @@ export function BannerAutomatico({ banner, largura, formato }: { banner: Dados; 
             </Texto>
             {formatarPreco(p.preco)}
           </Texto>
-          {parcelas.quantidade > 1 && (
+          {!fixo && parcelas.quantidade > 1 && (
             <Texto variante="pequeno" cor={oferta ? 'rgba(255,255,255,0.85)' : cores.textoSuave}>
               {parcelas.quantidade}x de {formatarPreco(parcelas.valor)}
             </Texto>
@@ -96,7 +100,6 @@ export function BannerAutomatico({ banner, largura, formato }: { banner: Dados; 
 const estilos = StyleSheet.create({
   banner: { borderRadius: raio.xl, overflow: 'hidden', padding: 18 },
   bola: { position: 'absolute' },
-  sorriso: { position: 'absolute', left: 18, bottom: 14 },
   vitrine: { position: 'absolute', right: 8, top: '7%', alignItems: 'center', justifyContent: 'center' },
   disco: { position: 'absolute' },
   foto: { width: '100%', height: '100%' },
@@ -111,10 +114,10 @@ const estilos = StyleSheet.create({
   },
   seloNumero: { fontFamily: fontes.titulo, color: cores.texto, lineHeight: undefined },
   seloOff: { fontFamily: fontes.titulo, color: cores.texto, marginTop: -2 },
-  coluna: { flex: 1, justifyContent: 'space-between', paddingBottom: 18 },
+  coluna: { flex: 1, justifyContent: 'space-between' },
   olho: { fontFamily: fontes.titulo, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 },
-  nome: { fontFamily: fontes.titulo, lineHeight: 26 },
-  preco: { fontFamily: fontes.titulo, fontSize: 24, lineHeight: 30 },
+  nome: { fontFamily: fontes.titulo },
+  preco: { fontFamily: fontes.titulo, fontSize: 22, lineHeight: 28 },
   por: { fontFamily: fontes.texto, fontSize: 13 },
   botao: { alignSelf: 'flex-start', marginTop: 8, borderRadius: raio.pilula, paddingHorizontal: 14, paddingVertical: 8 },
   botaoTexto: { fontFamily: fontes.titulo, fontSize: 14 },
