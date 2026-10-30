@@ -5,6 +5,8 @@ import { Animated, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet,
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useConta } from '@/estado/conta';
+import { useConversas } from '@/estado/conversas';
+import { useFigital } from '@/estado/figital';
 import { formatarCep } from '@/lib/formatar';
 import { cores, fontes, raio } from '@/lib/tema';
 import { Botao } from './botao';
@@ -40,19 +42,28 @@ export function Cabecalho() {
   const { cep } = useConta();
   const [editando, setEditando] = useState(false);
   const dica = useDicaPiscando();
+  const { lojaAtual } = useFigital();
+  const { conversas, iniciar } = useConversas();
+  // Com a loja marcada, a conversa vai direto para um vendedor dela; sem loja, abre a lista de conversas.
+  const conversar = () => {
+    if (!lojaAtual) return router.push('/conversas');
+    const id =
+      conversas.find((c) => c.loja === lojaAtual.slug)?.id ?? iniciar({ loja: lojaAtual.slug, nomeLoja: lojaAtual.nome, assunto: 'Dúvida na loja' });
+    router.push(`/conversas/${id}`);
+  };
   return (
     <View style={[estilos.topo, { paddingTop: topo + 10 }]}>
       <View style={estilos.linha}>
         <Logo variante="branca" altura={30} />
         <Pressable
-          onPress={() => router.push('/conversas')}
+          onPress={conversar}
           accessibilityRole="button"
-          accessibilityLabel="Fale com o vendedor"
+          accessibilityLabel={lojaAtual ? `Fale com o vendedor da loja ${lojaAtual.nome}` : 'Fale com o vendedor'}
           hitSlop={8}
           style={estilos.conversa}>
           <Animated.View style={[estilos.dica, { opacity: dica }]} pointerEvents="none">
             <Texto variante="pequeno" style={estilos.textoDica}>
-              Fale com o vendedor
+              {lojaAtual ? `Fale com o vendedor da ${lojaAtual.nome}` : 'Fale com o vendedor'}
             </Texto>
           </Animated.View>
           <Ionicons name="chatbubbles-outline" size={24} color="#fff" />
