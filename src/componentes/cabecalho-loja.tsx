@@ -10,15 +10,15 @@ import { useFigital } from '@/estado/figital';
 import { Botao } from './botao';
 import { Texto } from './texto';
 
-/** No modo loja o topo fica amarelo com o nome da loja e o carrinho da loja. Sair da loja fica separado (BotaoSairDaLoja). */
+/** No modo loja o topo fica amarelo com "Autoatendimento {loja}" e o carrinho da loja. Sair da loja fica separado (BotaoSairDaLoja). */
 export function CabecalhoLoja({ loja, titulo }: { loja: LojaFisica; titulo?: string }) {
   const quantidade = useCarrinho().quantidadeTotal(loja.slug);
   return (
     <Stack.Screen
       options={{
-        title: titulo ?? `Loja ${loja.nome}`,
+        title: titulo ?? `Autoatendimento ${loja.nome}`,
         headerStyle: { backgroundColor: cores.sorriso },
-        headerTitleStyle: { fontFamily: fontes.titulo, fontSize: 18 },
+        headerTitleStyle: { fontFamily: fontes.titulo, fontSize: titulo === undefined ? 16 : 18 },
         headerRight: () => (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, paddingRight: Platform.OS === 'web' ? 16 : 0 }}>
             <Pressable onPress={() => router.push(rotaCarrinhoLoja(loja.slug) as never)} hitSlop={8} accessibilityLabel="Carrinho da loja">

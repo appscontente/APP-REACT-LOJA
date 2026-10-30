@@ -57,6 +57,11 @@ export default function PortalLoja() {
         hrefDe={(p) => rotaFigital(loja.slug, p.slug)}
         cabecalho={
           <View style={estilos.topo}>
+            <Botao
+              titulo="Como funciona o autoatendimento"
+              icone={<Ionicons name="help-circle-outline" size={20} color="#fff" />}
+              onPress={() => setComoFunciona(true)}
+            />
             <View style={estilos.cartao}>
               <Texto variante="subtitulo">Você está na loja {loja.nome}</Texto>
               <View style={estilos.linha}>
@@ -79,7 +84,6 @@ export default function PortalLoja() {
                   forma de pagamento.
                 </Texto>
               </View>
-              <Botao titulo="Como funciona o autoatendimento" variante="texto" onPress={() => setComoFunciona(true)} />
               <BotaoSairDaLoja />
             </View>
             <View style={{ flexDirection: 'row', gap: 10 }}>
