@@ -18,6 +18,7 @@ import { Texto } from '@/componentes/texto';
 import { useCarrinho } from '@/estado/carrinho';
 import { useConta } from '@/estado/conta';
 import { useConversas } from '@/estado/conversas';
+import { useFigital } from '@/estado/figital';
 import { api, SITE_URL } from '@/lib/api';
 import { descontoExibido, nomeLegivel } from '@/lib/formatar';
 import { rotaProduto } from '@/lib/rotas';
@@ -31,6 +32,7 @@ export default function PaginaProduto() {
   const { adicionar } = useCarrinho();
   const { favorito, alternarFavorito } = useConta();
   const { iniciar } = useConversas();
+  const { lojaAtual } = useFigital();
 
   if (!dados && carregando) return <Carregando />;
   if (!dados) return <Erro mensagem={erro ?? ''} tentar={recarregar} />;
@@ -41,7 +43,8 @@ export default function PaginaProduto() {
   const item = { ...p, imagem: p.imagens[0]?.src };
 
   const conversar = () => {
-    const id = iniciar({ nomeLoja: 'Casa Contente', assunto: nome, produto: item });
+    // Quem está numa loja física fala com a equipe daquela loja; fora dela, com o atendimento do site.
+    const id = iniciar({ loja: lojaAtual?.slug, nomeLoja: lojaAtual?.nome ?? 'Casa Contente', assunto: nome, produto: item });
     router.push(`/conversas/${id}`);
   };
 

@@ -21,7 +21,10 @@ export type Mensagem = {
 
 export type Conversa = {
   id: string;
-  /** Slug da loja física; sem loja, cai na fila do atendimento do site. */
+  /**
+   * Slug da loja física; sem loja, cai na fila do atendimento do site. Com o Blip dentro do Happy, é por ele que a
+   * conversa entra na fila de atendimento daquela loja (a que o cliente escolheu ou onde ele está).
+   */
   loja?: string;
   nomeLoja: string;
   assunto: string;
