@@ -3,11 +3,12 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Botao } from '@/componentes/botao';
-import { CabecalhoLoja } from '@/componentes/cabecalho-loja';
+import { BotaoSairDaLoja, CabecalhoLoja } from '@/componentes/cabecalho-loja';
+import { ComoFuncionaAutoatendimento } from '@/componentes/como-funciona-autoatendimento';
 import { Aviso, Carregando } from '@/componentes/estado-tela';
 import { GradeProdutos } from '@/componentes/grade-produtos';
 import { Texto } from '@/componentes/texto';
@@ -15,7 +16,7 @@ import { useConversas } from '@/estado/conversas';
 import { useFigital } from '@/estado/figital';
 import { api } from '@/lib/api';
 import { rotaFigital } from '@/lib/rotas';
-import { cores, raio } from '@/lib/tema';
+import { cores, fontes, raio } from '@/lib/tema';
 import { useDados } from '@/lib/use-dados';
 
 export default function PortalLoja() {
@@ -23,7 +24,14 @@ export default function PortalLoja() {
   const { lojas, entrar } = useFigital();
   const { iniciar } = useConversas();
   const loja = lojas.find((l) => l.slug === slug);
-  const { dados, carregando, recarregar } = useDados(() => api.expostos(slug), [slug]);
+  const [texto, setTexto] = useState('');
+  const [termo, setTermo] = useState('');
+  // Sem busca, a vitrine mostra o que está exposto; com busca, o catálogo inteiro, aberto no modo desta loja.
+  const { dados, carregando, recarregar } = useDados(
+    () => (termo ? api.busca(termo).then((r) => r.produtos) : api.expostos(slug)),
+    [slug, termo],
+  );
+  const [comoFunciona, setComoFunciona] = useState(false);
 
   useEffect(() => {
     if (loja) entrar(loja.slug);
@@ -41,6 +49,7 @@ export default function PortalLoja() {
   return (
     <>
       <CabecalhoLoja loja={loja} />
+      <ComoFuncionaAutoatendimento visivel={comoFunciona} aoFechar={() => setComoFunciona(false)} aoComecar={() => setComoFunciona(false)} />
       <GradeProdutos
         produtos={dados ?? []}
         atualizando={carregando}
@@ -70,6 +79,8 @@ export default function PortalLoja() {
                   forma de pagamento.
                 </Texto>
               </View>
+              <Botao titulo="Como funciona o autoatendimento" variante="texto" onPress={() => setComoFunciona(true)} />
+              <BotaoSairDaLoja />
             </View>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <Botao
@@ -87,10 +98,37 @@ export default function PortalLoja() {
                 onPress={conversar}
               />
             </View>
-            <Texto variante="secao">Expostos nesta loja</Texto>
+            <View style={estilos.busca}>
+              <Ionicons name="search" size={20} color={cores.textoSuave} />
+              <TextInput
+                value={texto}
+                onChangeText={setTexto}
+                onSubmitEditing={() => setTermo(texto.trim().length >= 2 ? texto.trim() : '')}
+                placeholder="Procure o produto que deseja ver"
+                placeholderTextColor={cores.textoSuave}
+                returnKeyType="search"
+                autoCorrect={false}
+                style={estilos.entrada}
+                accessibilityLabel="Procurar produto nesta loja"
+              />
+              {texto ? (
+                <Pressable onPress={() => (setTexto(''), setTermo(''))} hitSlop={8} accessibilityLabel="Limpar busca">
+                  <Ionicons name="close-circle" size={20} color={cores.textoSuave} />
+                </Pressable>
+              ) : null}
+            </View>
+            <Texto variante="secao">{termo ? `Resultado para “${termo}”` : 'Expostos nesta loja'}</Texto>
           </View>
         }
-        vazio={carregando ? <Carregando /> : <Aviso titulo="Nenhuma peça exposta listada" texto="Leia o QR da etiqueta do produto que você está vendo." />}
+        vazio={
+          carregando ? (
+            <Carregando />
+          ) : termo ? (
+            <Aviso titulo="Não achamos esse produto" texto="Tente outro nome ou leia o QR da etiqueta." />
+          ) : (
+            <Aviso titulo="Nenhuma peça exposta listada" texto="Leia o QR da etiqueta ou procure o produto que você está vendo." />
+          )
+        }
       />
     </>
   );
@@ -101,4 +139,16 @@ const estilos = StyleSheet.create({
   cartao: { backgroundColor: cores.superficie, borderRadius: raio.l, padding: 16, gap: 8, borderWidth: 1, borderColor: cores.borda },
   linha: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
   desconto: { backgroundColor: cores.sucessoFundo, padding: 10, borderRadius: raio.m, marginTop: 4 },
+  busca: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: cores.superficie,
+    borderRadius: raio.pilula,
+    borderWidth: 1.5,
+    borderColor: cores.borda,
+    paddingHorizontal: 16,
+    height: 50,
+  },
+  entrada: { flex: 1, fontSize: 16, fontFamily: fontes.texto, color: cores.texto },
 });

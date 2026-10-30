@@ -8,6 +8,7 @@ import { Imagem } from '@/componentes/imagem';
 import { Texto } from '@/componentes/texto';
 import { SITUACOES, useConta } from '@/estado/conta';
 import { useConversas } from '@/estado/conversas';
+import { useFigital } from '@/estado/figital';
 import { formatarDataHora, formatarPreco, nomeLegivel } from '@/lib/formatar';
 import { cores, raio } from '@/lib/tema';
 
@@ -18,6 +19,7 @@ export default function Pedido() {
   const { numero } = useLocalSearchParams<{ numero: string }>();
   const { pedidos } = useConta();
   const { iniciar } = useConversas();
+  const { lojas } = useFigital();
   const pedido = pedidos.find((p) => p.numero === numero);
   if (!pedido) return <Aviso titulo="Pedido não encontrado" texto="Entre na sua conta para ver os pedidos do site e das lojas." acao="Minha conta" aoTocar={() => router.replace('/conta')} />;
   const s = SITUACOES[pedido.situacao];
@@ -65,7 +67,9 @@ export default function Pedido() {
           variante="contorno"
           icone={<Ionicons name="chatbubble-ellipses-outline" size={20} color={cores.marca} />}
           onPress={() => {
-            const id = iniciar({ nomeLoja: 'Casa Contente', assunto: `Pedido ${pedido.numero}`, pedido: pedido.numero });
+            // Pedido de retirada ou feito na loja: fala com a equipe dessa loja. Entrega em casa: atendimento do site.
+            const loja = lojas.find((l) => l.slug === pedido.loja);
+            const id = iniciar({ loja: loja?.slug, nomeLoja: loja?.nome ?? 'Casa Contente', assunto: `Pedido ${pedido.numero}`, pedido: pedido.numero });
             router.push(`/conversas/${id}`);
           }}
         />

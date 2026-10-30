@@ -89,3 +89,34 @@ export async function cotarFrete(cep: string, valorNota: number): Promise<Cotaca
   if (!resposta?.ok) throw new ErroApi(resposta?.status ?? 0, 'Não conseguimos calcular o frete agora. Tente de novo.');
   return resposta.json();
 }
+
+export type OpcaoRetirada = {
+  loja: string;
+  disponivel: boolean;
+  diasUteis?: number;
+  /** Texto pronto ("Pronto para retirar em até 2 dias úteis"). */
+  prazo?: string;
+  /** Por que não dá para retirar nesta loja. */
+  motivo?: string;
+  /** Usa peça de exposição: a loja confere o estado antes de confirmar o pedido. */
+  exposicao: boolean;
+  transferencia: boolean;
+  sugerida: boolean;
+  /** Motivos curtos ("Mais perto de você", "Fica pronta antes"). */
+  destaques: string[];
+};
+export type ResultadoRetirada = { opcoes: OpcaoRetirada[]; sugerida?: string };
+
+/** Em qual loja retirar e quando fica pronto, com a loja sugerida (CD da empresa 7 primeiro, como no site). */
+export async function consultarRetirada(
+  itens: { codprod: string; quantidade: number }[],
+  { cep, preferida }: { cep?: string; preferida?: string } = {},
+): Promise<ResultadoRetirada> {
+  const resposta = await fetch(`${SITE_URL}/api/app/retirada`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Canal': 'app' },
+    body: JSON.stringify({ itens, cep: cep?.replace(/\D/g, '') || undefined, preferida }),
+  }).catch(() => undefined);
+  if (!resposta?.ok) throw new ErroApi(resposta?.status ?? 0, 'Não conseguimos ver o prazo da retirada agora.');
+  return resposta.json();
+}

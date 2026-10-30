@@ -9,6 +9,7 @@ import { Cabecalho } from '@/componentes/cabecalho';
 import { Carrossel } from '@/componentes/carrossel';
 import { Carregando, Erro } from '@/componentes/estado-tela';
 import { Imagem } from '@/componentes/imagem';
+import { MenuDaLoja } from '@/componentes/menu-da-loja';
 import { Prateleira } from '@/componentes/prateleira';
 import { Texto } from '@/componentes/texto';
 import { api, SITE_URL } from '@/lib/api';
@@ -61,6 +62,7 @@ export default function Inicio() {
         <ScrollView
           contentContainerStyle={estilos.conteudo}
           refreshControl={<RefreshControl refreshing={carregando} onRefresh={recarregar} tintColor={cores.marca} />}>
+          <MenuDaLoja />
           <View style={{ marginTop: 16 }}>
             <Carrossel largura={largura}>
               {[

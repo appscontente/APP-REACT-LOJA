@@ -17,7 +17,10 @@
         "applinks:loja-casacontente.onrender.com"
       ],
       "infoPlist": {
-        "NSCameraUsageDescription": "A câmera lê o QR code das etiquetas e o código de barras dos produtos na loja."
+        "NSCameraUsageDescription": "A câmera lê o QR code das etiquetas e o código de barras dos produtos na loja.",
+        "UIBackgroundModes": [
+          "location"
+        ]
       }
     },
     "android": {
@@ -34,11 +37,23 @@
           "action": "VIEW",
           "autoVerify": true,
           "data": [
-            { "scheme": "https", "host": "casacontente.com.br" },
-            { "scheme": "https", "host": "www.casacontente.com.br" },
-            { "scheme": "https", "host": "loja-casacontente.onrender.com" }
+            {
+              "scheme": "https",
+              "host": "casacontente.com.br"
+            },
+            {
+              "scheme": "https",
+              "host": "www.casacontente.com.br"
+            },
+            {
+              "scheme": "https",
+              "host": "loja-casacontente.onrender.com"
+            }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -53,6 +68,21 @@
         {
           "cameraPermission": "A câmera lê o QR code das etiquetas e o código de barras dos produtos na loja.",
           "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "A localização serve para o app dar boas-vindas quando você chega numa loja Casa Contente. Ela fica só no celular.",
+          "locationAlwaysAndWhenInUsePermission": "Com o app fechado, a localização serve para avisar quando você passar 2 minutos numa loja Casa Contente. Ela fica só no celular e você desliga na Conta.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#d71921"
         }
       ],
       "expo-secure-store",

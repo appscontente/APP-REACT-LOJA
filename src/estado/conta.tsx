@@ -13,7 +13,7 @@ export type PedidoApp = {
   criadoEm: string;
   itens: ItemCarrinho[];
   total: number;
-  forma: 'pix' | 'cartao';
+  forma: 'pix' | 'cartao' | 'cartao-pix';
   entrega: 'entrega' | 'retirada';
   /** Como o site: "Pedido recebido, pagamento em análise" até a ClearSale e a captura. */
   situacao: 'em-analise' | 'aguardando-pix';

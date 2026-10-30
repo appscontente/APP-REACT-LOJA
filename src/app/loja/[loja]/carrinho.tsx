@@ -10,7 +10,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 import { Botao } from '@/componentes/botao';
-import { CabecalhoLoja } from '@/componentes/cabecalho-loja';
+import { BotaoSairDaLoja, CabecalhoLoja } from '@/componentes/cabecalho-loja';
 import { Campo } from '@/componentes/campo';
 import { Aviso, Carregando } from '@/componentes/estado-tela';
 import { ItemCarrinho } from '@/componentes/item-carrinho';
@@ -42,7 +42,7 @@ type Comprovante = { numero: string; expiraEm: string; total: number; itens: { n
 export default function CarrinhoLoja() {
   const { loja: slug } = useLocalSearchParams<{ loja: string }>();
   const { lojas } = useFigital();
-  const { itens, esvaziar, adicionar } = useCarrinho();
+  const { itens, esvaziar } = useCarrinho();
   const [nome, setNome] = useState('');
   const [cpf, setCpf] = useState('');
   const [comprovante, setComprovante] = useState<Comprovante>();
@@ -88,14 +88,23 @@ export default function CarrinhoLoja() {
     return (
       <>
         <CabecalhoLoja loja={loja} titulo="Carrinho da loja" />
-        <Aviso titulo="Carrinho da loja vazio" texto="Leia o QR das etiquetas para pôr produtos aqui." acao="Ler etiqueta" aoTocar={() => router.push('/leitor')} />
+        <Aviso
+          titulo="Carrinho da loja vazio"
+          texto="Leia o QR das etiquetas para pôr produtos aqui."
+          acao="Ler etiqueta"
+          aoTocar={() => router.push('/leitor')}
+        />
       </>
     );
 
   const pronto = nome.trim().length > 2 && cpf.replace(/\D/g, '').length === 11;
 
   return (
-    <ScrollView contentContainerStyle={estilos.conteudo} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      contentContainerStyle={estilos.conteudo}
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
+      keyboardDismissMode="interactive">
       <CabecalhoLoja loja={loja} titulo="Carrinho da loja" />
       {lista.map((i) => (
         <ItemCarrinho key={i.codprod} item={i} destino={loja.slug} />
@@ -135,19 +144,19 @@ export default function CarrinhoLoja() {
           })}
         </ScrollView>
         <Texto variante="pequeno" cor={cores.textoSuave}>
-          O desconto vale só nesta forma de pagamento: no caixa, pagar em mais parcelas cancela o pedido. Com menos parcelas
-          pode.
+          O desconto vale só nesta forma de pagamento: no caixa, pagar em mais parcelas cancela o pedido. Com menos parcelas pode.
         </Texto>
       </View>
       <View style={estilos.caixa}>
-        <Texto variante="subtitulo">Finalizar no caixa</Texto>
+        <Texto variante="subtitulo">Quer pagar no caixa da loja?</Texto>
         <Texto variante="pequeno" cor={cores.textoSuave}>
-          Você recebe um comprovante com QR e paga no caixa. Os produtos ficam reservados por {loja.horasReserva} horas.
+          Informe seu nome e CPF e gere o comprovante. É só mostrar no caixa e pagar, sem precisar chamar um vendedor. Seus produtos ficam separados
+          para você por {loja.horasReserva} horas.
         </Texto>
         <Campo rotulo="Nome completo" value={nome} onChangeText={setNome} autoComplete="name" />
         <Campo rotulo="CPF" value={cpf} onChangeText={(t) => setCpf(t.replace(/\D/g, '').slice(0, 11))} keyboardType="number-pad" />
         <Botao
-          titulo="Gerar comprovante para o caixa"
+          titulo="Gerar meu comprovante"
           disabled={!pronto}
           onPress={() => {
             setComprovante({
@@ -160,15 +169,19 @@ export default function CarrinhoLoja() {
           }}
         />
       </View>
-      <Botao
-        titulo="Concluir pelo app (entrega ou retirada)"
-        variante="texto"
-        onPress={() => {
-          lista.forEach(({ quantidade, ...i }) => adicionar(i, 'site', quantidade));
-          esvaziar(loja.slug);
-          router.push('/checkout');
-        }}
-      />
+      <View style={estilos.caixa}>
+        <Texto variante="subtitulo">Prefere pagar pelo celular?</Texto>
+        <Texto variante="pequeno" cor={cores.textoSuave}>
+          Pague pelo app e receba em casa ou retire depois. Se mudar de ideia, dá para voltar aqui e pagar no caixa.
+        </Texto>
+        <Botao
+          titulo="Pagar pelo app"
+          variante="contorno"
+          // Os itens continuam no carrinho da loja: se o cliente voltar, ainda pode pagar no caixa.
+          onPress={() => router.push({ pathname: '/checkout', params: { loja: loja.slug } })}
+        />
+      </View>
+      <BotaoSairDaLoja />
     </ScrollView>
   );
 }

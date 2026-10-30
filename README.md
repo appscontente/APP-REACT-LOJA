@@ -26,6 +26,7 @@ Sankhya → sync → Postgres → backend (FastAPI) → site (Next.js, rotas /ap
 | --- | --- |
 | Início (banners com arte + banners automáticos do dia), categorias, busca com sugestões, produto, ofertas, frete por CEP | Dados reais do site |
 | Botão fixo "Na loja" (Figital): escolher a loja ou ler o QR, estoque CD x loja, carrinho por loja, comprovante com QR para o caixa | Dados reais do site; o comprovante ainda não cria o pedido no Sankhya |
+| Boas-vindas na loja: 2 minutos perto de uma loja, o app dá as boas-vindas e entra no modo dela (liga na Conta) | Com o app aberto funciona até no Expo Go; com o app fechado (aviso no celular) só no app instalado pelo EAS |
 | Leitor de QR e código de barras (câmera) | Funciona; etiqueta `/qr/{CODEMP}/{CODPROD}` abre o produto na loja |
 | Conversa com a loja (no lugar do WhatsApp) | Demonstração no celular, com resposta automática; falta a rota no backend |
 | Carrinho, checkout (Pix ou cartão), pedidos, favoritos, entrar com código no e-mail | Demonstração: fica só no celular, nada é cobrado e o cartão nunca é guardado |

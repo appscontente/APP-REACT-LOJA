@@ -9,6 +9,7 @@ import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { BotaoFigital } from '@/componentes/botao-figital';
+import { ProvedorBoasVindas } from '@/estado/boas-vindas';
 import { ProvedorCarrinho } from '@/estado/carrinho';
 import { ProvedorConta } from '@/estado/conta';
 import { ProvedorConversas } from '@/estado/conversas';
@@ -34,6 +35,7 @@ export default function Raiz() {
       <ThemeProvider value={tema}>
         <ProvedorConta>
           <ProvedorFigital>
+            <ProvedorBoasVindas>
             <ProvedorCarrinho>
               <ProvedorConversas>
                 <View style={{ flex: 1 }}>
@@ -56,6 +58,7 @@ export default function Raiz() {
                 </View>
               </ProvedorConversas>
             </ProvedorCarrinho>
+            </ProvedorBoasVindas>
           </ProvedorFigital>
         </ProvedorConta>
       </ThemeProvider>
