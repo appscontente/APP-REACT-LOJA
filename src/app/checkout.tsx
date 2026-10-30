@@ -18,6 +18,7 @@ import { useConta } from '@/estado/conta';
 import { useFigital } from '@/estado/figital';
 import { consultarRetirada, cotarFrete, type CotacaoFrete, type ResultadoRetirada } from '@/lib/api';
 import { arredondar, calcularParcelas, formatarCep, formatarPreco } from '@/lib/formatar';
+import { rotaCarrinhoLoja } from '@/lib/rotas';
 import { dividir, escreverValor, lerValor, sugerirCartao } from '@/lib/pagamento-dividido';
 import { cores, fontes, raio } from '@/lib/tema';
 
@@ -210,6 +211,7 @@ export default function Checkout() {
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets
       keyboardDismissMode="interactive">
+      {daLoja ? <VoltarParaLoja slug={daLoja} nome={lojas.find((l) => l.slug === daLoja)?.nome} /> : null}
       <Etapa numero={1} titulo="Seus dados">
         <Campo rotulo="E-mail" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
         <Campo rotulo="Nome completo" value={nome} onChangeText={setNome} autoComplete="name" />
@@ -443,7 +445,40 @@ export default function Checkout() {
   );
 }
 
+/**
+ * Carrinho que veio do autoatendimento: o cliente pode mudar de ideia, voltar ao carrinho da loja, mexer nos itens ou
+ * pagar no caixa. Os itens continuam lá até o pedido ser feito.
+ */
+function VoltarParaLoja({ slug, nome }: { slug: string; nome?: string }) {
+  const voltar = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace(rotaCarrinhoLoja(slug) as never);
+  };
+  return (
+    <View style={estilos.daLoja}>
+      <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+        <Ionicons name="storefront-outline" size={22} color={cores.marca} />
+        <Texto variante="forte" style={{ flex: 1 }}>
+          Carrinho do autoatendimento{nome ? ` da loja ${nome}` : ''}
+        </Texto>
+      </View>
+      <Texto variante="pequeno" cor={cores.textoSuave}>
+        Mudou de ideia? Volte para mexer nos produtos ou para pagar no caixa da loja. Nada se perde.
+      </Texto>
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <View style={{ flex: 1 }}>
+          <Botao titulo="Editar carrinho" variante="contorno" onPress={voltar} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Botao titulo="Pagar no caixa" variante="contorno" onPress={voltar} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
 const estilos = StyleSheet.create({
+  daLoja: { backgroundColor: cores.creme, borderRadius: raio.l, padding: 16, gap: 10 },
   conteudo: { padding: 16, gap: 16, paddingBottom: 48 },
   etapa: {
     backgroundColor: cores.superficie,
