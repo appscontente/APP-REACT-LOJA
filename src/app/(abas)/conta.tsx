@@ -2,22 +2,24 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Botao } from '@/componentes/botao';
 import { Sorriso } from '@/componentes/logo';
 import { Texto } from '@/componentes/texto';
 import { useBoasVindas } from '@/estado/boas-vindas';
-import { useConta } from '@/estado/conta';
+import { useConta, useSairDaConta } from '@/estado/conta';
 import { useConversas } from '@/estado/conversas';
+import { temSegundoPlano } from '@/lib/perto-da-loja';
 import { cores, fontes, raio } from '@/lib/tema';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function Entrar() {
+/** Depois de entrar, volta à tela que pediu o login (ex.: um pedido aberto por link). Só caminhos da área do cliente. */
+function Entrar({ voltar }: { voltar?: string }) {
   const { entrar } = useConta();
   const [email, setEmail] = useState('');
   const [enviado, setEnviado] = useState(false);
@@ -28,7 +30,7 @@ function Entrar() {
       <Texto cor={cores.textoSuave}>
         {enviado
           ? `Mandamos um código de 6 números para ${email}. Ele vale por 10 minutos.`
-          : 'Sem senha: mandamos um código para o seu e-mail. Suas compras nas lojas aparecem aqui também.'}
+          : 'Sem senha: mandamos um código para o seu e-mail. Suas compras pelo site e pelo app aparecem aqui.'}
       </Texto>
       {!enviado ? (
         <>
@@ -53,7 +55,17 @@ function Entrar() {
             autoComplete="one-time-code"
             style={[estilos.entrada, { letterSpacing: 8, textAlign: 'center' }]}
           />
-          <Botao titulo="Entrar" disabled={codigo.length !== 6} onPress={() => entrar(email.trim().toLowerCase())} />
+          <Botao
+            titulo="Entrar"
+            disabled={codigo.length !== 6}
+            onPress={() => {
+              entrar(email.trim().toLowerCase());
+              if (voltar?.startsWith('/minha-conta/')) {
+                router.setParams({ voltar: undefined });
+                router.push(voltar as never);
+              }
+            }}
+          />
           <Texto variante="pequeno" cor={cores.textoSuave} style={{ textAlign: 'center' }}>
             Demonstração: qualquer código de 6 números entra.
           </Texto>
@@ -88,6 +100,27 @@ function Opcao({ icone, titulo, texto, aoTocar, contador }: { icone: React.Compo
   );
 }
 
+/** Leva aos ajustes do app no celular, onde o cliente muda a permissão de localização. */
+function avisarAjustes(titulo: string, texto: string) {
+  Alert.alert(titulo, texto, [
+    { text: 'Agora não', style: 'cancel' },
+    { text: 'Abrir ajustes', onPress: () => Linking.openSettings().catch(() => undefined) },
+  ]);
+}
+
+/**
+ * O que escolher na tela de permissão do celular. Sem a localização exata as boas-vindas não funcionam; no Android, o
+ * "o tempo todo" só aparece no app instalado (no Expo Go não há aviso com o app fechado).
+ */
+const ESCOLHA_PERMISSAO =
+  Platform.OS === 'android'
+    ? temSegundoPlano
+      ? ' Na próxima tela, deixe a localização “Precisa” e, quando o celular pedir, escolha “Permitir o tempo todo”.'
+      : ' Na próxima tela, deixe a localização “Precisa”.'
+    : Platform.OS === 'ios'
+      ? ' Na próxima tela, deixe a “Localização Exata” ligada.'
+      : '';
+
 /** Liga as boas-vindas na loja. Explica antes de o celular pedir a permissão de localização. */
 function OpcaoBoasVindas() {
   const { ligado, ligar, desligar } = useBoasVindas();
@@ -95,13 +128,17 @@ function OpcaoBoasVindas() {
     if (!quer) return desligar();
     Alert.alert(
       'Boas-vindas na loja',
-      'Quando você passar 2 minutos numa loja Casa Contente, o app dá as boas-vindas e já entra no modo daquela loja. Para isso ele usa a localização do celular, que fica só no aparelho e não é guardada. Você pode desligar aqui quando quiser.',
+      'Quando você passar 2 minutos numa loja Casa Contente, o app dá as boas-vindas e já entra no modo daquela loja. Para isso ele usa a localização do celular, inclusive com o app fechado ou sem uso.' +
+        ESCOLHA_PERMISSAO +
+        ' O celular guarda só em qual loja e quando você recebeu as boas-vindas; sua localização não sai do celular. Você pode desligar aqui quando quiser.',
       [
         { text: 'Agora não', style: 'cancel' },
         {
           text: 'Ligar',
           onPress: async () => {
-            if (!(await ligar())) Alert.alert('Sem localização', 'Para ligar, permita a localização do app nos ajustes do celular.');
+            const resultado = await ligar();
+            if (resultado === 'sem-permissao') avisarAjustes('Sem localização', 'Para ligar, permita a localização do app nos ajustes do celular.');
+            else if (resultado === 'aproximada') avisarAjustes('Localização aproximada', 'Para as boas-vindas, ative a localização exata nos ajustes do celular.');
           },
         },
       ],
@@ -129,8 +166,19 @@ function OpcaoBoasVindas() {
 
 export default function Conta() {
   const topo = useSafeAreaInsets().top;
-  const { logado, email, pedidos, favoritos, sair } = useConta();
+  const { voltar } = useLocalSearchParams<{ voltar?: string }>();
+  const { logado, email, pedidos, favoritos } = useConta();
+  const sair = useSairDaConta();
   const { naoLidas } = useConversas();
+  const confirmarSaida = () =>
+    Alert.alert(
+      'Sair da conta?',
+      'Saem deste celular seus pedidos, favoritos, CEP, conversas com a loja e buscas recentes. O carrinho continua.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Sair', style: 'destructive', onPress: sair },
+      ],
+    );
   return (
     <ScrollView style={estilos.tela} contentContainerStyle={[estilos.conteudo, { paddingTop: topo + 12 }]} automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled">
       <View style={estilos.ola}>
@@ -138,11 +186,11 @@ export default function Conta() {
         <Texto variante="titulo">{logado ? 'Olá!' : 'Minha conta'}</Texto>
         {logado ? <Texto cor={cores.textoSuave}>{email}</Texto> : null}
       </View>
-      {!logado && <Entrar />}
+      {!logado && <Entrar voltar={voltar} />}
       <View style={estilos.grupo}>
-        <Opcao icone="receipt-outline" titulo="Meus pedidos" texto="Do app, do site e das lojas" contador={pedidos.length} aoTocar={() => router.push('/minha-conta/pedidos')} />
+        <Opcao icone="receipt-outline" titulo="Meus pedidos" texto="Do app e do site" contador={pedidos.length} aoTocar={() => router.push('/minha-conta/pedidos')} />
         <Opcao icone="chatbubbles-outline" titulo="Conversas com a loja" texto="Tire dúvidas com um vendedor" contador={naoLidas} aoTocar={() => router.push('/conversas')} />
-        <Opcao icone="heart-outline" titulo="Favoritos" texto="Avisamos quando baixar o preço" contador={favoritos.length} aoTocar={() => router.push('/favoritos')} />
+        <Opcao icone="heart-outline" titulo="Favoritos" texto="Os produtos que você salvou" contador={favoritos.length} aoTocar={() => router.push('/favoritos')} />
         <Opcao icone="cube-outline" titulo="Acompanhar entrega" aoTocar={() => router.push('/rastreio')} />
       </View>
       <View style={estilos.grupo}>
@@ -150,7 +198,7 @@ export default function Conta() {
         <OpcaoBoasVindas />
         <Opcao icone="shield-checkmark-outline" titulo="Privacidade" texto="Seus dados, avisos e excluir conta" aoTocar={() => router.push('/privacidade')} />
       </View>
-      {logado && <Botao titulo="Sair da conta" variante="contorno" onPress={sair} />}
+      {logado && <Botao titulo="Sair da conta" variante="contorno" onPress={confirmarSaida} />}
       <Texto variante="pequeno" cor={cores.textoSuave} style={{ textAlign: 'center' }}>
         Casa Contente · versão {Constants.expoConfig?.version} · Desenvolvido por Contente+
       </Texto>

@@ -1,32 +1,51 @@
 // Busca em tela cheia, a mesma do site (sinônimos e correção): sugestões enquanto digita, buscas recentes e o leitor
-// do QR da etiqueta ou do código de barras. Aceita /busca?q= vindo de um link do site.
+// do QR da etiqueta ou do código de barras. Aceita /busca?q= vindo de um link do site e /busca?foco= (toque na busca do
+// início: limpa e abre o teclado; o número muda a cada toque porque a aba fica montada).
 
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Aviso, Carregando } from '@/componentes/estado-tela';
+import { Aviso, Carregando, Erro } from '@/componentes/estado-tela';
 import { GradeProdutos } from '@/componentes/grade-produtos';
 import { Imagem } from '@/componentes/imagem';
+import { FichasOrdenacao } from '@/componentes/tela-lista';
 import { Texto } from '@/componentes/texto';
-import { api } from '@/lib/api';
+import { useConversas } from '@/estado/conversas';
+import { api, ErroApi, SITE_URL } from '@/lib/api';
 import { gravar, ler } from '@/lib/armazenamento';
 import { formatarPreco } from '@/lib/formatar';
+import { rotaInterna } from '@/lib/rotas';
 import { cores, fontes, raio } from '@/lib/tema';
 import type { ResultadoBusca } from '@/lib/tipos';
 
 type Sugestoes = Awaited<ReturnType<typeof api.sugestoes>>;
+/** Uma busca feita: o resultado ou o erro, com o termo, a ordenação e a vez que o pediram. */
+type Buscado = { termo: string; ordenacao: string; vez: number; resultado?: ResultadoBusca; erro?: string };
 const CHAVE_RECENTES = 'busca:recentes';
+
+/** Destino que veio do site (atalho do admin ou sugestão): caminho nosso vira tela do app; outro endereço abre fora. */
+function abrirDestino(destino: string) {
+  const interna = rotaInterna(destino, SITE_URL);
+  if (interna) router.push(interna as never);
+  else if (/^https?:\/\//.test(destino)) WebBrowser.openBrowserAsync(destino);
+}
 
 export default function Busca() {
   const topo = useSafeAreaInsets().top;
-  const { q } = useLocalSearchParams<{ q?: string }>();
+  const { iniciar } = useConversas();
+  const { q, foco } = useLocalSearchParams<{ q?: string; foco?: string }>();
+  const campo = useRef<React.ComponentRef<typeof TextInput>>(null);
   const [texto, setTexto] = useState(q ?? '');
   const [termo, setTermo] = useState(q ?? '');
+  const [ordenacao, setOrdenacao] = useState('relevancia');
+  // Muda a cada busca e a cada "Tentar de novo": repetir o mesmo termo busca de novo.
+  const [vez, setVez] = useState(0);
   const [sugeridas, setSugeridas] = useState<{ texto: string; sugestoes: Sugestoes }>();
-  const [buscado, setBuscado] = useState<{ termo: string; resultado: ResultadoBusca }>();
+  const [buscado, setBuscado] = useState<Buscado>();
   const [recentes, setRecentes] = useState<string[]>([]);
   // Link aberto com outro ?q= (ex. banner): troca a busca sem esperar um efeito.
   const [qAnterior, setQAnterior] = useState(q);
@@ -35,12 +54,29 @@ export default function Busca() {
     if (q) {
       setTexto(q);
       setTermo(q);
+      setOrdenacao('relevancia');
+    }
+  }
+  // Toque na busca do início: começa do zero (o foco no campo vem no efeito abaixo).
+  const [focoAnterior, setFocoAnterior] = useState(foco);
+  if (foco !== focoAnterior) {
+    setFocoAnterior(foco);
+    if (foco) {
+      setTexto('');
+      setTermo('');
     }
   }
 
   useEffect(() => {
-    ler<string[]>(CHAVE_RECENTES, []).then(setRecentes);
-  }, []);
+    if (foco) campo.current?.focus();
+  }, [foco]);
+
+  // Relê ao voltar para a aba: depois de "Sair da conta" as buscas recentes somem também daqui.
+  useFocusEffect(
+    useCallback(() => {
+      ler<string[]>(CHAVE_RECENTES, []).then(setRecentes);
+    }, []),
+  );
   // Sugestões enquanto digita (espera o cliente parar um instante).
   useEffect(() => {
     if (texto.trim().length < 2 || texto === termo) return;
@@ -59,38 +95,64 @@ export default function Busca() {
     if (termo.trim().length < 2) return;
     let ativo = true;
     api
-      .busca(termo.trim())
+      .busca(termo.trim(), ordenacao === 'relevancia' ? undefined : ordenacao)
       .then((r) => {
         if (!ativo) return;
-        if (r.redirecionar) router.push(r.redirecionar as never);
-        setBuscado({ termo, resultado: r });
+        if (r.redirecionar) {
+          // Atalho do admin (ex. "black friday" => /ofertas): abre a página e não guarda resultado vazio.
+          abrirDestino(r.redirecionar);
+          setTexto('');
+          setTermo('');
+          setBuscado(undefined);
+          return;
+        }
+        setBuscado({ termo, ordenacao, vez, resultado: r });
       })
-      .catch(() => ativo && setBuscado({ termo, resultado: { produtos: [] } }));
+      .catch(
+        (e) =>
+          ativo &&
+          setBuscado({ termo, ordenacao, vez, erro: e instanceof ErroApi ? e.message : 'Não conseguimos buscar agora. Tente de novo.' }),
+      );
     return () => {
       ativo = false;
     };
-  }, [termo]);
+  }, [termo, ordenacao, vez]);
 
   const buscar = (t: string) => {
     const limpo = t.trim();
     if (limpo.length < 2) return;
     setTexto(limpo);
     setTermo(limpo);
+    setOrdenacao('relevancia');
+    setVez((v) => v + 1);
     const novos = [limpo, ...recentes.filter((r) => r.toLowerCase() !== limpo.toLowerCase())].slice(0, 8);
     setRecentes(novos);
     gravar(CHAVE_RECENTES, novos);
   };
+  const limpar = () => {
+    setTexto('');
+    setTermo('');
+    campo.current?.focus();
+  };
+  const tentarDeNovo = () => setVez((v) => v + 1);
+  // Sem resultado: abre a conversa com a loja já com o que o cliente procurou.
+  const conversar = () => {
+    const id = iniciar({ nomeLoja: 'Casa Contente', assunto: `Produto que não achei: “${termo.trim()}”` });
+    router.push(`/conversas/${id}` as never);
+  };
 
   const sugestoes = texto !== termo && sugeridas?.texto === texto ? sugeridas.sugestoes : undefined;
   const termoValido = termo.trim().length >= 2;
-  const resultado = termoValido && buscado?.termo === termo ? buscado.resultado : undefined;
-  const buscando = termoValido && !resultado;
+  const atual = termoValido && buscado?.termo === termo && buscado.ordenacao === ordenacao && buscado.vez === vez ? buscado : undefined;
+  const resultado = atual?.resultado;
+  const buscando = termoValido && !atual;
 
   return (
     <View style={[estilos.tela, { paddingTop: topo + 8 }]}>
       <View style={estilos.barra}>
         <Ionicons name="search" size={20} color={cores.textoSuave} />
         <TextInput
+          ref={campo}
           value={texto}
           onChangeText={setTexto}
           onSubmitEditing={() => buscar(texto)}
@@ -102,7 +164,7 @@ export default function Busca() {
           accessibilityLabel="Buscar produtos"
         />
         {texto ? (
-          <Pressable onPress={() => (setTexto(''), setTermo(''))} hitSlop={8} accessibilityLabel="Limpar busca">
+          <Pressable onPress={limpar} hitSlop={8} accessibilityLabel="Limpar busca">
             <Ionicons name="close-circle" size={20} color={cores.textoSuave} />
           </Pressable>
         ) : (
@@ -113,15 +175,15 @@ export default function Busca() {
       </View>
 
       {sugestoes && (sugestoes.produtos.length > 0 || sugestoes.categorias.length > 0) ? (
-        <View style={estilos.sugestoes}>
+        <ScrollView style={estilos.rolagem} contentContainerStyle={estilos.sugestoes} keyboardShouldPersistTaps="handled">
           {sugestoes.categorias.map((c) => (
-            <Pressable key={c.href} style={estilos.sugestao} onPress={() => router.push(c.href as never)}>
+            <Pressable key={c.href} style={estilos.sugestao} onPress={() => abrirDestino(c.href)}>
               <Ionicons name="grid-outline" size={18} color={cores.marca} />
               <Texto>{c.nome}</Texto>
             </Pressable>
           ))}
           {sugestoes.produtos.map((p) => (
-            <Pressable key={p.href} style={estilos.sugestao} onPress={() => router.push(p.href as never)}>
+            <Pressable key={p.href} style={estilos.sugestao} onPress={() => abrirDestino(p.href)}>
               <Imagem uri={p.imagem} style={{ width: 40, height: 40 }} />
               <View style={{ flex: 1 }}>
                 <Texto variante="rotulo" numberOfLines={1}>
@@ -139,31 +201,36 @@ export default function Busca() {
               Ver todos os resultados para “{texto.trim()}”
             </Texto>
           </Pressable>
-        </View>
+        </ScrollView>
       ) : buscando ? (
         <Carregando />
+      ) : atual?.erro ? (
+        <Erro mensagem={atual.erro} tentar={tentarDeNovo} />
       ) : resultado ? (
         <GradeProdutos
           produtos={resultado.produtos}
           cabecalho={
-            <Texto cor={cores.textoSuave} style={{ paddingHorizontal: 16, paddingTop: 8 }}>
-              {resultado.corrigido
-                ? `Mostrando resultados para “${resultado.corrigido}”`
-                : `${resultado.produtos.length} ${resultado.produtos.length === 1 ? 'produto' : 'produtos'} para “${termo}”`}
-            </Texto>
+            <View style={estilos.cabecalho}>
+              <Texto cor={cores.textoSuave} style={{ paddingHorizontal: 16 }}>
+                {resultado.corrigido
+                  ? `Mostrando resultados para “${resultado.corrigido}”`
+                  : `${resultado.produtos.length} ${resultado.produtos.length === 1 ? 'produto' : 'produtos'} para “${termo}”`}
+              </Texto>
+              {resultado.produtos.length > 1 ? <FichasOrdenacao ativa={ordenacao} aoEscolher={setOrdenacao} /> : null}
+            </View>
           }
           vazio={
             <Aviso
               titulo="Não achamos nada com esse nome"
               texto="Tente outra palavra ou fale com a nossa equipe pela conversa do app."
               acao="Conversar com a loja"
-              aoTocar={() => router.push('/conversas')}
+              aoTocar={conversar}
               triste
             />
           }
         />
       ) : (
-        <View style={estilos.recentes}>
+        <ScrollView contentContainerStyle={estilos.recentes} keyboardShouldPersistTaps="handled">
           {recentes.length > 0 && (
             <>
               <Texto variante="subtitulo">Buscas recentes</Texto>
@@ -187,7 +254,7 @@ export default function Busca() {
             </View>
             <Ionicons name="chevron-forward" size={18} color={cores.textoSuave} />
           </Pressable>
-        </View>
+        </ScrollView>
       )}
     </View>
   );
@@ -208,7 +275,9 @@ const estilos = StyleSheet.create({
     borderColor: cores.marca,
   },
   entrada: { flex: 1, fontFamily: fontes.textoMedio, fontSize: 16, color: cores.texto, height: '100%' },
-  sugestoes: { marginTop: 8, backgroundColor: cores.superficie, borderTopWidth: 1, borderColor: cores.borda },
+  rolagem: { flex: 1, marginTop: 8 },
+  sugestoes: { backgroundColor: cores.superficie, borderTopWidth: 1, borderColor: cores.borda },
+  cabecalho: { gap: 8, paddingTop: 8 },
   sugestao: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -5,7 +5,18 @@ import { cores } from '@/lib/tema';
 import { Texto } from './texto';
 
 /** Linhas de valores (subtotal, frete, descontos, total). */
-export function Resumo({ linhas, total, rodape }: { linhas: [string, string, string?][]; total: number; rodape?: string }) {
+export function Resumo({
+  linhas,
+  total,
+  rodape,
+  rotuloTotal = 'Total',
+}: {
+  linhas: [string, string, string?][];
+  total: number;
+  rodape?: string;
+  /** Ex.: "Total no caixa" no carrinho da loja. */
+  rotuloTotal?: string;
+}) {
   return (
     <View style={estilos.caixa}>
       {linhas.map(([rotulo, valor, cor]) => (
@@ -17,7 +28,7 @@ export function Resumo({ linhas, total, rodape }: { linhas: [string, string, str
         </View>
       ))}
       <View style={[estilos.linha, estilos.total]}>
-        <Texto variante="subtitulo">Total</Texto>
+        <Texto variante="subtitulo">{rotuloTotal}</Texto>
         <Texto variante="subtitulo">{formatarPreco(total)}</Texto>
       </View>
       {rodape ? (

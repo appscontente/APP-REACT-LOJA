@@ -10,7 +10,10 @@ import { useFigital } from '@/estado/figital';
 import { Botao } from './botao';
 import { Texto } from './texto';
 
-/** No modo loja o topo fica amarelo com "Autoatendimento {loja}" e o carrinho da loja. Sair da loja fica separado (BotaoSairDaLoja). */
+/**
+ * No modo loja o topo fica amarelo com "Autoatendimento {loja}", o atalho do leitor (para ler a próxima etiqueta de
+ * qualquer tela da loja) e o carrinho da loja. Sair da loja fica separado (BotaoSairDaLoja).
+ */
 export function CabecalhoLoja({ loja, titulo }: { loja: LojaFisica; titulo?: string }) {
   const quantidade = useCarrinho().quantidadeTotal(loja.slug);
   return (
@@ -21,6 +24,9 @@ export function CabecalhoLoja({ loja, titulo }: { loja: LojaFisica; titulo?: str
         headerTitleStyle: { fontFamily: fontes.titulo, fontSize: titulo === undefined ? 16 : 18 },
         headerRight: () => (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, paddingRight: Platform.OS === 'web' ? 16 : 0 }}>
+            <Pressable onPress={() => router.push('/leitor')} hitSlop={8} accessibilityLabel="Ler etiqueta">
+              <Ionicons name="qr-code" size={22} color={cores.texto} />
+            </Pressable>
             <Pressable onPress={() => router.push(rotaCarrinhoLoja(loja.slug) as never)} hitSlop={8} accessibilityLabel="Carrinho da loja">
               <Ionicons name="cart" size={24} color={cores.texto} />
               {quantidade > 0 ? (
@@ -48,7 +54,8 @@ export function BotaoSairDaLoja() {
       icone={<Ionicons name="exit-outline" size={18} color={cores.marca} />}
       onPress={() => {
         sair();
-        router.replace('/');
+        // O início é aba: volta para as abas em vez de empilhar outra cópia delas (#21).
+        router.dismissTo('/');
       }}
     />
   );
