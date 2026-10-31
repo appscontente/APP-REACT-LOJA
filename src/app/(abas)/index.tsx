@@ -17,6 +17,9 @@ import { rotaCategoria, rotaDepartamento, rotaInterna } from '@/lib/rotas';
 import { cores, raio } from '@/lib/tema';
 import type { BannerArte, Departamento } from '@/lib/tipos';
 import { useDados } from '@/lib/use-dados';
+import { useMaisProdutos } from '@/lib/use-mais-produtos';
+import { CardProduto } from '@/componentes/card-produto';
+import { ActivityIndicator } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 
 const AMBIENTES = [
@@ -50,6 +53,9 @@ export default function Inicio() {
   const { width } = useWindowDimensions();
   const largura = Math.min(width, 600) - 32;
   const { dados, erro, carregando, recarregar } = useDados(() => api.inicio(), []);
+  const jaNaTela = dados ? [...dados.achados, ...dados.vitrines.flatMap((v) => v.produtos)].map((p) => p.codprod) : [];
+  const mais = useMaisProdutos(dados?.departamentos ?? [], jaNaTela);
+  const larguraCard = (largura - 12) / 2;
 
   return (
     <View style={estilos.tela}>
@@ -61,6 +67,11 @@ export default function Inicio() {
       ) : (
         <ScrollView
           contentContainerStyle={estilos.conteudo}
+          // Perto do fim, chega mais uma leva de produtos sorteados.
+          onScroll={({ nativeEvent: n }) => {
+            if (n.contentOffset.y + n.layoutMeasurement.height > n.contentSize.height - 800) mais.carregarMais();
+          }}
+          scrollEventThrottle={250}
           refreshControl={<RefreshControl refreshing={carregando} onRefresh={recarregar} tintColor={cores.marca} />}>
           <MenuDaLoja />
           <View style={{ marginTop: 16 }}>
@@ -123,6 +134,20 @@ export default function Inicio() {
           {dados.vitrines.map((v) => (
             <Prateleira key={v.slug} titulo={v.nome} produtos={v.produtos} />
           ))}
+
+          {mais.produtos.length > 0 && (
+            <View style={estilos.bloco}>
+              <Texto variante="secao" style={{ marginBottom: 12 }}>
+                Mais para você
+              </Texto>
+              <View style={estilos.grade}>
+                {mais.produtos.map((p) => (
+                  <CardProduto key={p.codprod} produto={p} largura={larguraCard} />
+                ))}
+              </View>
+            </View>
+          )}
+          {mais.carregando ? <ActivityIndicator color={cores.marca} style={{ marginTop: 24 }} /> : null}
         </ScrollView>
       )}
     </View>
@@ -146,5 +171,6 @@ const estilos = StyleSheet.create({
   },
   bloco: { paddingHorizontal: 16, marginTop: 28 },
   ambientes: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  grade: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   ambiente: { aspectRatio: 4 / 3, borderRadius: raio.l, padding: 12, justifyContent: 'space-between' },
 });

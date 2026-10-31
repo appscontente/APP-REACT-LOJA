@@ -4,8 +4,8 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { router, usePathname } from 'expo-router';
-import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Animated, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useFigital } from '@/estado/figital';
@@ -21,11 +21,33 @@ const COM_ABAS = ['/', '/categorias', '/busca', '/carrinho', '/conta'];
 /** Páginas de produto têm a barra de compra fixa embaixo. */
 const COM_BARRA = [/^\/[^/]+\/p$/, /^\/loja\/[^/]+\/p\//];
 
+/** De quanto em quanto tempo o rótulo do botão troca entre "Na loja" e "Autoatendimento". */
+const TROCA_MS = 2500;
+
+/** Alterna os rótulos com um esmaecer curto, para o cliente entender que o botão é o autoatendimento. */
+function useRotuloAlternado(rotulos: string[]) {
+  const [indice, setIndice] = useState(0);
+  const [opacidade] = useState(() => new Animated.Value(1));
+  const quantos = rotulos.length;
+  useEffect(() => {
+    if (quantos < 2) return;
+    const relogio = setInterval(() => {
+      Animated.timing(opacidade, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => {
+        setIndice((i) => (i + 1) % quantos);
+        Animated.timing(opacidade, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+      });
+    }, TROCA_MS);
+    return () => clearInterval(relogio);
+  }, [quantos, opacidade]);
+  return { rotulo: rotulos[indice % quantos], opacidade };
+}
+
 export function BotaoFigital() {
   const caminho = usePathname();
   const baixo = useSafeAreaInsets().bottom;
   const { lojaAtual } = useFigital();
   const [escolhendo, setEscolhendo] = useState(false);
+  const { rotulo, opacidade } = useRotuloAlternado([lojaAtual ? lojaAtual.nome : 'Na loja', 'Autoatendimento']);
   if (ESCONDER.some((r) => r.test(caminho))) return null;
   const naLoja = lojaAtual && caminho.startsWith(rotaLoja(lojaAtual.slug));
   if (naLoja) return null;
@@ -37,7 +59,7 @@ export function BotaoFigital() {
       <Pressable
         onPress={() => (lojaAtual ? router.push(rotaLoja(lojaAtual.slug) as never) : setEscolhendo(true))}
         accessibilityRole="button"
-        accessibilityLabel={lojaAtual ? `Abrir a loja ${lojaAtual.nome}` : 'Estou na loja'}
+        accessibilityLabel={lojaAtual ? `Abrir o autoatendimento da loja ${lojaAtual.nome}` : 'Estou na loja: autoatendimento'}
         style={({ pressed }) => [
           estilos.botao,
           noProduto && estilos.compacto,
@@ -46,7 +68,11 @@ export function BotaoFigital() {
         ]}>
         <Ionicons name="storefront" size={22} color={cores.texto} />
         {/* No produto o botão fica só com o ícone, para não cobrir o frete e o preço. */}
-        {!noProduto && <Texto style={estilos.rotulo}>{lojaAtual ? lojaAtual.nome : 'Na loja'}</Texto>}
+        {!noProduto && (
+          <Animated.View style={{ opacity: opacidade }}>
+            <Texto style={estilos.rotulo}>{rotulo}</Texto>
+          </Animated.View>
+        )}
       </Pressable>
       <GavetaLojas aberta={escolhendo} fechar={() => setEscolhendo(false)} />
     </>

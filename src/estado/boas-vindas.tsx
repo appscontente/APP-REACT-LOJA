@@ -5,7 +5,7 @@ import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { createContext, useContext, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Botao } from '@/componentes/botao';
 import { ComoFuncionaAutoatendimento } from '@/componentes/como-funciona-autoatendimento';
@@ -75,6 +75,8 @@ export function ProvedorBoasVindas({ children }: { children: ReactNode }) {
 
   // Tocar no aviso de boas-vindas abre a loja e entra no modo dela.
   useEffect(() => {
+    // Na prévia do navegador não há avisos do celular.
+    if (Platform.OS === 'web') return;
     const abrir = (r: Notifications.NotificationResponse | null) => {
       const slug = r?.notification.request.content.data?.loja;
       if (typeof slug !== 'string') return;

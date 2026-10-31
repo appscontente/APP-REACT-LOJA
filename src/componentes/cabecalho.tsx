@@ -1,30 +1,71 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Animated, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useConta } from '@/estado/conta';
+import { useConversas } from '@/estado/conversas';
+import { useFigital } from '@/estado/figital';
 import { formatarCep } from '@/lib/formatar';
 import { cores, fontes, raio } from '@/lib/tema';
 import { Botao } from './botao';
 import { Logo } from './logo';
 import { Texto } from './texto';
 
+/** A cada tanto, o botão da conversa mostra "Fale com o vendedor" por alguns segundos e volta a ser só o ícone. */
+const DICA_A_CADA_MS = 20 * 1000;
+const DICA_DURA_MS = 4 * 1000;
+
+function useDicaPiscando() {
+  const [opacidade] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    const mostrar = () =>
+      Animated.sequence([
+        Animated.timing(opacidade, { toValue: 1, duration: 250, useNativeDriver: true }),
+        Animated.delay(DICA_DURA_MS),
+        Animated.timing(opacidade, { toValue: 0, duration: 250, useNativeDriver: true }),
+      ]).start();
+    const primeira = setTimeout(mostrar, 3000);
+    const relogio = setInterval(mostrar, DICA_A_CADA_MS);
+    return () => {
+      clearTimeout(primeira);
+      clearInterval(relogio);
+    };
+  }, [opacidade]);
+  return opacidade;
+}
+
 /** Topo do início: logo, barra de busca (abre a aba Busca) e o CEP para mostrar frete e prazo. */
 export function Cabecalho() {
   const topo = useSafeAreaInsets().top;
   const { cep } = useConta();
   const [editando, setEditando] = useState(false);
+  const dica = useDicaPiscando();
+  const { lojaAtual } = useFigital();
+  const { conversas, iniciar } = useConversas();
+  // Com a loja marcada, a conversa vai direto para um vendedor dela; sem loja, abre a lista de conversas.
+  const conversar = () => {
+    if (!lojaAtual) return router.push('/conversas');
+    const id =
+      conversas.find((c) => c.loja === lojaAtual.slug)?.id ?? iniciar({ loja: lojaAtual.slug, nomeLoja: lojaAtual.nome, assunto: 'Dúvida na loja' });
+    router.push(`/conversas/${id}`);
+  };
   return (
     <View style={[estilos.topo, { paddingTop: topo + 10 }]}>
       <View style={estilos.linha}>
         <Logo variante="branca" altura={30} />
         <Pressable
-          onPress={() => router.push('/conversas')}
+          onPress={conversar}
           accessibilityRole="button"
-          accessibilityLabel="Conversas com a loja"
-          hitSlop={8}>
+          accessibilityLabel={lojaAtual ? `Fale com o vendedor da loja ${lojaAtual.nome}` : 'Fale com o vendedor'}
+          hitSlop={8}
+          style={estilos.conversa}>
+          <Animated.View style={[estilos.dica, { opacity: dica }]} pointerEvents="none">
+            <Texto variante="pequeno" style={estilos.textoDica}>
+              {lojaAtual ? `Fale com o vendedor da ${lojaAtual.nome}` : 'Fale com o vendedor'}
+            </Texto>
+          </Animated.View>
           <Ionicons name="chatbubbles-outline" size={24} color="#fff" />
         </Pressable>
       </View>
@@ -84,6 +125,9 @@ export function GavetaCep({ aberta, fechar }: { aberta: boolean; fechar: () => v
 }
 
 const estilos = StyleSheet.create({
+  conversa: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dica: { backgroundColor: cores.sorriso, borderRadius: raio.pilula, paddingHorizontal: 10, paddingVertical: 4 },
+  textoDica: { fontFamily: fontes.titulo, color: cores.texto },
   topo: { backgroundColor: cores.marca, paddingHorizontal: 16, paddingBottom: 12, gap: 12 },
   linha: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   busca: {
