@@ -4,9 +4,10 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { gravar, ler } from '@/lib/armazenamento';
+import { apagar, gravar, ler } from '@/lib/armazenamento';
 import { cores } from '@/lib/tema';
 import type { ItemCarrinho } from './carrinho';
+import { useConversas } from './conversas';
 
 export type PedidoApp = {
   numero: string;
@@ -18,13 +19,33 @@ export type PedidoApp = {
   /** Como o site: "Pedido recebido, pagamento em análise" até a ClearSale e a captura. */
   situacao: 'em-analise' | 'aguardando-pix';
   loja?: string;
+  /** Celular com DDD, só dígitos (cliente.celular do contrato 3.3). */
+  celular?: string;
+  /** Endereço de entrega (ou da nota, na retirada), no formato de `entrega` do contrato 3.3. */
+  endereco?: { cep: string; logradouro: string; numero: string; complemento?: string; bairro: string; cidade: string; uf: string; referencia?: string };
+  /** Pix que falta pagar (Pix sozinho ou cartão + Pix), com os nomes de pagamento.pendente.pix do contrato 17.12. */
+  pix?: { valor: number; copiaECola?: string; imagemBase64?: string; expiraEm?: string };
 };
 
-/** Como a situação aparece para o cliente. */
-export const SITUACOES: Record<PedidoApp['situacao'], { texto: string; cor: string; fundo: string }> = {
+type Situacao = { texto: string; cor: string; fundo: string };
+
+/**
+ * Como a situação aparece para o cliente. Antes de ligar o backend, acrescentar as situações do contrato 17.5
+ * (recebido, pagamento_aprovado, faturado, em_separacao, saiu_para_entrega, entregue, montagem_agendada, montado,
+ * retirado, cancelado em vermelho) e desenhar as etapas do pedido pela linhaDoTempo.
+ */
+export const SITUACOES: Record<PedidoApp['situacao'], Situacao> = {
   'em-analise': { texto: 'Pagamento em análise', cor: cores.aviso, fundo: cores.avisoFundo },
-  'aguardando-pix': { texto: 'Aguardando o Pix', cor: cores.aviso, fundo: cores.avisoFundo },
+  'aguardando-pix': { texto: 'Falta pagar o Pix', cor: cores.aviso, fundo: cores.avisoFundo },
 };
+
+const SITUACAO_DESCONHECIDA: Situacao = { texto: 'Em andamento', cor: cores.textoSuave, fundo: cores.fundoAlt };
+
+/** Situação para mostrar; uma que o app ainda não conhece vira "Em andamento" em vez de derrubar a tela. */
+export const situacaoDe = (s: string): Situacao => (SITUACOES as Record<string, Situacao | undefined>)[s] ?? SITUACAO_DESCONHECIDA;
+
+/** Buscas recentes da aba Busca (mesma chave de src/app/(abas)/busca.tsx). */
+const CHAVE_BUSCAS = 'busca:recentes';
 
 type Dados = {
   email?: string;
@@ -35,6 +56,8 @@ type Dados = {
 };
 
 type Contexto = Dados & {
+  /** true depois de ler do celular o que estava guardado (antes disso, pedidos e favoritos vêm vazios). */
+  pronto: boolean;
   logado: boolean;
   entrar: (email: string, nome?: string) => void;
   sair: () => void;
@@ -64,9 +87,15 @@ export function ProvedorConta({ children }: { children: ReactNode }) {
   const valor = useMemo<Contexto>(
     () => ({
       ...dados,
+      pronto,
       logado: Boolean(dados.email),
       entrar: (email, nome) => setDados((d) => ({ ...d, email, nome: nome ?? d.nome })),
-      sair: () => setDados((d) => ({ ...d, email: undefined, nome: undefined, pedidos: [] })),
+      // Sai e apaga do celular o que é da pessoa: e-mail, nome, pedidos, favoritos, CEP e buscas recentes (as conversas
+      // saem por useSairDaConta). O carrinho fica. Com o backend, também apaga o token do cofre.
+      sair: () => {
+        setDados({ favoritos: [], pedidos: [] });
+        apagar([CHAVE_BUSCAS]);
+      },
       definirCep: (cep) => setDados((d) => ({ ...d, cep })),
       alternarFavorito: (codprod) =>
         setDados((d) => ({
@@ -76,10 +105,20 @@ export function ProvedorConta({ children }: { children: ReactNode }) {
       favorito: (codprod) => dados.favoritos.includes(codprod),
       registrarPedido: (pedido) => setDados((d) => ({ ...d, pedidos: [pedido, ...d.pedidos] })),
     }),
-    [dados],
+    [dados, pronto],
   );
 
   return <ContextoConta.Provider value={valor}>{children}</ContextoConta.Provider>;
+}
+
+/** Sair da conta apagando também as conversas deste celular. Usado em "Sair da conta" e depois de excluir a conta. */
+export function useSairDaConta() {
+  const { sair } = useConta();
+  const { limpar } = useConversas();
+  return () => {
+    sair();
+    limpar();
+  };
 }
 
 export function useConta() {

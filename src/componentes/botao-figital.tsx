@@ -5,13 +5,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Animated, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Animated, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useFigital } from '@/estado/figital';
+import { useFigital, useLojas } from '@/estado/figital';
 import { rotaLoja } from '@/lib/rotas';
 import { cores, fontes, raio } from '@/lib/tema';
-import { ALTURA_BARRA_COMPRA } from './barra-compra';
+import { useReduzirMovimento } from '@/lib/use-reduzir-movimento';
+import { ALTURA_BARRA_COMPRA, useAvisoCarrinhoAberto } from './barra-compra';
 import { Botao } from './botao';
 import { Texto } from './texto';
 
@@ -24,13 +25,20 @@ const COM_BARRA = [/^\/[^/]+\/p$/, /^\/loja\/[^/]+\/p\//];
 /** De quanto em quanto tempo o rótulo do botão troca entre "Na loja" e "Autoatendimento". */
 const TROCA_MS = 2500;
 
-/** Alterna os rótulos com um esmaecer curto, para o cliente entender que o botão é o autoatendimento. */
+/**
+ * Alterna os rótulos com um esmaecer curto, para o cliente entender que o botão é o autoatendimento. Com "Reduzir
+ * movimento" ligado, fica parado no último rótulo ("Autoatendimento").
+ */
 function useRotuloAlternado(rotulos: string[]) {
   const [indice, setIndice] = useState(0);
   const [opacidade] = useState(() => new Animated.Value(1));
+  const reduzir = useReduzirMovimento();
   const quantos = rotulos.length;
   useEffect(() => {
-    if (quantos < 2) return;
+    if (quantos < 2 || reduzir) {
+      opacidade.setValue(1);
+      return;
+    }
     const relogio = setInterval(() => {
       Animated.timing(opacidade, { toValue: 0, duration: 180, useNativeDriver: true }).start(() => {
         setIndice((i) => (i + 1) % quantos);
@@ -38,8 +46,18 @@ function useRotuloAlternado(rotulos: string[]) {
       });
     }, TROCA_MS);
     return () => clearInterval(relogio);
-  }, [quantos, opacidade]);
-  return { rotulo: rotulos[indice % quantos], opacidade };
+  }, [quantos, opacidade, reduzir]);
+  return { rotulo: reduzir ? rotulos[quantos - 1] : rotulos[indice % quantos], opacidade };
+}
+
+/** Só existe enquanto o rótulo aparece: o relógio da alternância não roda com o botão escondido ou só com o ícone. */
+function RotuloAlternado({ rotulos }: { rotulos: string[] }) {
+  const { rotulo, opacidade } = useRotuloAlternado(rotulos);
+  return (
+    <Animated.View style={{ opacity: opacidade }}>
+      <Texto style={estilos.rotulo}>{rotulo}</Texto>
+    </Animated.View>
+  );
 }
 
 export function BotaoFigital() {
@@ -47,7 +65,8 @@ export function BotaoFigital() {
   const baixo = useSafeAreaInsets().bottom;
   const { lojaAtual } = useFigital();
   const [escolhendo, setEscolhendo] = useState(false);
-  const { rotulo, opacidade } = useRotuloAlternado([lojaAtual ? lojaAtual.nome : 'Na loja', 'Autoatendimento']);
+  // O aviso "Adicionado ao carrinho" fica em cima da barra de compra: o botão sairia por cima do "Ver carrinho".
+  const avisoAberto = useAvisoCarrinhoAberto();
   if (ESCONDER.some((r) => r.test(caminho))) return null;
   const naLoja = lojaAtual && caminho.startsWith(rotaLoja(lojaAtual.slug));
   if (naLoja) return null;
@@ -56,31 +75,31 @@ export function BotaoFigital() {
   const alturaAbas = COM_ABAS.includes(caminho) ? 66 : noProduto ? ALTURA_BARRA_COMPRA : 0;
   return (
     <>
-      <Pressable
-        onPress={() => (lojaAtual ? router.push(rotaLoja(lojaAtual.slug) as never) : setEscolhendo(true))}
-        accessibilityRole="button"
-        accessibilityLabel={lojaAtual ? `Abrir o autoatendimento da loja ${lojaAtual.nome}` : 'Estou na loja: autoatendimento'}
-        style={({ pressed }) => [
-          estilos.botao,
-          noProduto && estilos.compacto,
-          { bottom: baixo + alturaAbas + 16 },
-          pressed && { transform: [{ scale: 0.96 }] },
-        ]}>
-        <Ionicons name="storefront" size={22} color={cores.texto} />
-        {/* No produto o botão fica só com o ícone, para não cobrir o frete e o preço. */}
-        {!noProduto && (
-          <Animated.View style={{ opacity: opacidade }}>
-            <Texto style={estilos.rotulo}>{rotulo}</Texto>
-          </Animated.View>
-        )}
-      </Pressable>
+      {!avisoAberto && (
+        <Pressable
+          onPress={() => (lojaAtual ? router.push(rotaLoja(lojaAtual.slug) as never) : setEscolhendo(true))}
+          accessibilityRole="button"
+          accessibilityLabel={lojaAtual ? `Abrir o autoatendimento da loja ${lojaAtual.nome}` : 'Estou na loja: autoatendimento'}
+          style={({ pressed }) => [
+            estilos.botao,
+            noProduto && estilos.compacto,
+            { bottom: baixo + alturaAbas + 16 },
+            pressed && { transform: [{ scale: 0.96 }] },
+          ]}>
+          <Ionicons name="storefront" size={22} color={cores.texto} />
+          {/* No produto o botão fica só com o ícone, para não cobrir o frete e o preço. */}
+          {!noProduto && <RotuloAlternado rotulos={[lojaAtual ? lojaAtual.nome : 'Na loja', 'Autoatendimento']} />}
+        </Pressable>
+      )}
+      {/* A gaveta fica montada mesmo com o botão escondido, para não perder o estado dela. */}
       <GavetaLojas aberta={escolhendo} fechar={() => setEscolhendo(false)} />
     </>
   );
 }
 
 export function GavetaLojas({ aberta, fechar }: { aberta: boolean; fechar: () => void }) {
-  const { lojas, entrar } = useFigital();
+  // useLojas busca a lista de novo se ela não veio ao abrir o app (sem internet, por exemplo).
+  const { lojas, entrar, erroLojas, tentarLojas } = useLojas();
   const baixo = useSafeAreaInsets().bottom;
   return (
     <Modal visible={aberta} transparent animationType="slide" onRequestClose={fechar}>
@@ -99,6 +118,14 @@ export function GavetaLojas({ aberta, fechar }: { aberta: boolean; fechar: () =>
             router.push('/leitor');
           }}
         />
+        {!lojas.length && erroLojas ? (
+          <View style={{ gap: 8 }}>
+            <Texto cor={cores.textoSuave}>Não conseguimos carregar as lojas. Confira a internet.</Texto>
+            <Botao titulo="Tentar de novo" variante="secundario" onPress={tentarLojas} />
+          </View>
+        ) : !lojas.length ? (
+          <ActivityIndicator color={cores.marca} style={{ paddingVertical: 16 }} accessibilityLabel="Carregando as lojas" />
+        ) : null}
         <ScrollView style={{ maxHeight: 320 }} contentContainerStyle={{ gap: 8 }}>
           {lojas.map((l) => (
             <Pressable

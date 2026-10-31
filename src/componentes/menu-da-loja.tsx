@@ -4,32 +4,42 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { useFigital } from '@/estado/figital';
 import { api } from '@/lib/api';
 import { rotaFigital, rotaLoja } from '@/lib/rotas';
 import { cores, raio } from '@/lib/tema';
+import type { Departamento } from '@/lib/tipos';
 import { useDados } from '@/lib/use-dados';
 import { Botao } from './botao';
 import { CardProduto } from './card-produto';
 import { Texto } from './texto';
 
-/** "guarda-roupas" → "Guarda-roupas". */
-const nomeCategoria = (slug: string) => {
+/** Só quando a categoria não está nos departamentos: "racks-e-paineis" → "Racks e paineis" (sem acento). */
+const nomeDoSlug = (slug: string) => {
   const texto = slug.replace(/-/g, ' ');
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 };
 
-export function MenuDaLoja() {
+/** Os departamentos dão o nome certo, com acento, de cada categoria. O início já os tem e pode passar por prop. */
+export function MenuDaLoja({ departamentos }: { departamentos?: Departamento[] }) {
   const { lojaAtual } = useFigital();
   const slug = lojaAtual?.slug;
-  const { dados } = useDados(() => (slug ? api.expostos(slug) : Promise.resolve([])), [slug]);
+  const { dados, erro, carregando, recarregar } = useDados(() => (slug ? api.expostos(slug) : Promise.resolve([])), [slug]);
+  const { dados: buscados } = useDados(
+    () => (slug && !departamentos ? api.departamentos() : Promise.resolve(undefined)),
+    [slug, Boolean(departamentos)],
+  );
   const [categoria, setCategoria] = useState<string>();
   if (!lojaAtual) return null;
 
+  const deps = departamentos ?? buscados ?? [];
+  const nomeCategoria = (departamento: string, cat: string) =>
+    deps.find((d) => d.slug === departamento)?.categorias.find((c) => c.slug === cat)?.nome ?? nomeDoSlug(cat);
   const produtos = dados ?? [];
-  const categorias = [...new Set(produtos.map((p) => p.categoria).filter(Boolean))];
+  const categorias = new Map<string, string>();
+  for (const p of produtos) if (p.categoria && !categorias.has(p.categoria)) categorias.set(p.categoria, nomeCategoria(p.departamento, p.categoria));
   const visiveis = categoria ? produtos.filter((p) => p.categoria === categoria) : produtos;
 
   return (
@@ -50,9 +60,9 @@ export function MenuDaLoja() {
         />
         <Botao titulo="Ver a loja" variante="contorno" style={{ flex: 1 }} onPress={() => router.push(rotaLoja(lojaAtual.slug) as never)} />
       </View>
-      {categorias.length > 1 ? (
+      {categorias.size > 1 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={estilos.chips}>
-          {[undefined, ...categorias].map((c) => (
+          {[undefined, ...categorias.keys()].map((c) => (
             <Pressable
               key={c ?? 'todas'}
               onPress={() => setCategoria(c)}
@@ -60,13 +70,22 @@ export function MenuDaLoja() {
               accessibilityRole="button"
               accessibilityState={{ selected: categoria === c }}>
               <Texto variante="rotulo" cor={categoria === c ? '#fff' : cores.texto}>
-                {c ? nomeCategoria(c) : 'Tudo'}
+                {c ? categorias.get(c) : 'Tudo'}
               </Texto>
             </Pressable>
           ))}
         </ScrollView>
       ) : null}
-      {visiveis.length ? (
+      {!dados && carregando ? (
+        <ActivityIndicator color={cores.marca} style={{ paddingVertical: 24 }} />
+      ) : !dados && erro ? (
+        <View style={{ paddingHorizontal: 16, gap: 4, alignItems: 'flex-start' }}>
+          <Texto variante="pequeno" cor={cores.textoSuave}>
+            Não conseguimos carregar os produtos expostos.
+          </Texto>
+          <Botao titulo="Tentar de novo" variante="texto" onPress={recarregar} />
+        </View>
+      ) : visiveis.length ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={estilos.lista}>
           {visiveis.map((p) => (
             <CardProduto key={p.codprod} produto={p} largura={156} href={rotaFigital(lojaAtual.slug, p.slug)} />

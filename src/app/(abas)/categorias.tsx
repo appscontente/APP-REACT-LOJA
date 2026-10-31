@@ -12,11 +12,15 @@ import { rotaCategoria, rotaDepartamento } from '@/lib/rotas';
 import { cores, raio } from '@/lib/tema';
 import { useDados } from '@/lib/use-dados';
 
+const ILUSTRACAO_PADRAO = `${SITE_URL}/img/categorias/padrao.svg`;
+
 /** Departamentos com as categorias de cada um; tocar no nome abre a lista do departamento inteiro. */
 export default function Categorias() {
   const topo = useSafeAreaInsets().top;
   const { dados, erro, carregando, recarregar } = useDados(() => api.departamentos(), []);
   const [aberto, setAberto] = useState<string>();
+  // Ilustração que não carregou (slug do Sankhya sem desenho próprio): troca pela padrão do site.
+  const [semIlustracao, setSemIlustracao] = useState<Record<string, true>>({});
 
   return (
     <View style={[estilos.tela, { paddingTop: topo }]}>
@@ -41,7 +45,11 @@ export default function Categorias() {
             return (
               <View key={d.slug} style={estilos.cartao}>
                 <Pressable style={estilos.departamento} onPress={() => setAberto(expandido ? undefined : d.slug)}>
-                  <Imagem uri={`${SITE_URL}/img/categorias/${d.slug}.svg`} style={{ width: 40, height: 40 }} />
+                  <Imagem
+                    uri={semIlustracao[d.slug] ? ILUSTRACAO_PADRAO : (d.ilustracao ?? `${SITE_URL}/img/categorias/${d.slug}.svg`)}
+                    onError={() => setSemIlustracao((s) => (s[d.slug] ? s : { ...s, [d.slug]: true }))}
+                    style={{ width: 40, height: 40 }}
+                  />
                   <Texto variante="subtitulo" style={{ flex: 1 }}>
                     {d.nome}
                   </Texto>

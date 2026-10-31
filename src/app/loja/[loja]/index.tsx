@@ -9,25 +9,26 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Botao } from '@/componentes/botao';
 import { BotaoSairDaLoja, CabecalhoLoja } from '@/componentes/cabecalho-loja';
 import { ComoFuncionaAutoatendimento } from '@/componentes/como-funciona-autoatendimento';
-import { Aviso, Carregando } from '@/componentes/estado-tela';
+import { Aviso, Carregando, Erro } from '@/componentes/estado-tela';
 import { GradeProdutos } from '@/componentes/grade-produtos';
 import { Texto } from '@/componentes/texto';
 import { useConversas } from '@/estado/conversas';
-import { useFigital } from '@/estado/figital';
+import { useLojas } from '@/estado/figital';
 import { api } from '@/lib/api';
-import { rotaFigital } from '@/lib/rotas';
+import { formatarHora } from '@/lib/formatar';
+import { rotaCarrinhoLoja, rotaFigital } from '@/lib/rotas';
 import { cores, fontes, raio } from '@/lib/tema';
 import { useDados } from '@/lib/use-dados';
 
 export default function PortalLoja() {
   const { loja: slug } = useLocalSearchParams<{ loja: string }>();
-  const { lojas, entrar } = useFigital();
+  const { lojas, erroLojas, tentarLojas, entrar, comprovante } = useLojas();
   const { iniciar } = useConversas();
   const loja = lojas.find((l) => l.slug === slug);
   const [texto, setTexto] = useState('');
   const [termo, setTermo] = useState('');
   // Sem busca, a vitrine mostra o que está exposto; com busca, o catálogo inteiro, aberto no modo desta loja.
-  const { dados, carregando, recarregar } = useDados(
+  const { dados, erro, carregando, recarregar } = useDados(
     () => (termo ? api.busca(termo).then((r) => r.produtos) : api.expostos(slug)),
     [slug, termo],
   );
@@ -38,8 +39,9 @@ export default function PortalLoja() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loja?.slug]);
 
-  if (!lojas.length) return <Carregando />;
-  if (!loja) return <Aviso titulo="Loja não encontrada" acao="Voltar ao início" aoTocar={() => router.replace('/')} triste />;
+  if (!lojas.length) return erroLojas ? <Erro mensagem="Não conseguimos carregar as lojas." tentar={tentarLojas} /> : <Carregando />;
+  if (!loja) return <Aviso titulo="Loja não encontrada" acao="Voltar ao início" aoTocar={() => router.dismissTo('/')} triste />;
+  const aberto = comprovante(loja.slug);
 
   const conversar = () => {
     const id = iniciar({ loja: loja.slug, nomeLoja: loja.nome, assunto: 'Dúvida na loja' });
@@ -57,6 +59,21 @@ export default function PortalLoja() {
         hrefDe={(p) => rotaFigital(loja.slug, p.slug)}
         cabecalho={
           <View style={estilos.topo}>
+            {aberto ? (
+              <Pressable
+                style={estilos.comprovante}
+                onPress={() => router.push(`${rotaCarrinhoLoja(loja.slug)}?comprovante=1` as never)}
+                accessibilityRole="button">
+                <Ionicons name="receipt-outline" size={22} color={cores.texto} />
+                <View style={{ flex: 1 }}>
+                  <Texto variante="rotulo">Seu comprovante Nº {aberto.numero}: mostrar no caixa</Texto>
+                  <Texto variante="pequeno" cor={cores.textoSuave}>
+                    Reserva até {formatarHora(aberto.expiraEm)}
+                  </Texto>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={cores.texto} />
+              </Pressable>
+            ) : null}
             <Botao
               titulo="Como funciona o autoatendimento"
               icone={<Ionicons name="help-circle-outline" size={20} color="#fff" />}
@@ -80,8 +97,8 @@ export default function PortalLoja() {
               ) : null}
               <View style={estilos.desconto}>
                 <Texto variante="rotulo" cor={cores.sucesso}>
-                  Mega descontos no autoatendimento: comprando sozinho pelo app, o desconto aparece no carrinho conforme a
-                  forma de pagamento.
+                  Mega descontos no autoatendimento: finalizando no caixa sem vendedor, o desconto aparece no carrinho conforme
+                  a forma de pagamento.
                 </Texto>
               </View>
               <BotaoSairDaLoja />
@@ -127,6 +144,8 @@ export default function PortalLoja() {
         vazio={
           carregando ? (
             <Carregando />
+          ) : erro ? (
+            <Erro mensagem={erro} tentar={recarregar} />
           ) : termo ? (
             <Aviso titulo="Não achamos esse produto" texto="Tente outro nome ou leia o QR da etiqueta." />
           ) : (
@@ -142,6 +161,7 @@ const estilos = StyleSheet.create({
   topo: { padding: 16, paddingBottom: 0, gap: 14 },
   cartao: { backgroundColor: cores.superficie, borderRadius: raio.l, padding: 16, gap: 8, borderWidth: 1, borderColor: cores.borda },
   linha: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  comprovante: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: raio.l, backgroundColor: cores.sorriso },
   desconto: { backgroundColor: cores.sucessoFundo, padding: 10, borderRadius: raio.m, marginTop: 4 },
   busca: {
     flexDirection: 'row',

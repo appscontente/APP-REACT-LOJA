@@ -17,6 +17,10 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+credentials.json
+*.keystore
+# Pasta combinada para a chave JSON da Play e keystores locais.
+chaves/
 
 # Metro
 .metro-health-check*

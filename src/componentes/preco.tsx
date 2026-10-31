@@ -1,16 +1,17 @@
 import { StyleSheet, View } from 'react-native';
 
-import { calcularParcelas, DESCONTO_PIX, formatarPreco, PARCELAMENTO_PADRAO, precoPix } from '@/lib/formatar';
+import { useRegraPagamento } from '@/estado/pagamento';
+import { calcularParcelas, DESCONTO_PIX, formatarPreco, precoPix } from '@/lib/formatar';
 import { cores } from '@/lib/tema';
 import type { Pagamento } from '@/lib/tipos';
 import { Texto } from './texto';
 
-/** Preço de/por, à vista no Pix e parcelas sem juros, na ordem do site. */
+/** Preço de/por, à vista no Pix e parcelas sem juros, na ordem do site. Sem `pagamento`, vale a regra que o site mandou. */
 export function Preco({
   preco,
   precoDe,
   descontoPix = DESCONTO_PIX,
-  pagamento = PARCELAMENTO_PADRAO,
+  pagamento,
   tamanho = 'card',
 }: {
   preco: number;
@@ -19,7 +20,8 @@ export function Preco({
   pagamento?: Pick<Pagamento, 'maxParcelas' | 'parcelaMinima'>;
   tamanho?: 'card' | 'pagina';
 }) {
-  const parcelas = calcularParcelas(preco, pagamento);
+  const regra = useRegraPagamento();
+  const parcelas = calcularParcelas(preco, pagamento ?? regra);
   const grande = tamanho === 'pagina';
   return (
     <View style={estilos.coluna}>
