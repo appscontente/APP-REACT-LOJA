@@ -5,7 +5,7 @@ import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { createContext, useContext, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Botao } from '@/componentes/botao';
 import { ComoFuncionaAutoatendimento } from '@/componentes/como-funciona-autoatendimento';
@@ -19,8 +19,10 @@ import {
   distancia,
   jaSaudou,
   ligarSegundoPlano,
+  limparBoasVindas,
   lojasNoMapa,
   marcarSaudada,
+  segundoPlanoLigado,
   temSegundoPlano,
   type LojaNoMapa,
   type Ponto,
@@ -49,8 +51,27 @@ type Contexto = {
 
 const ContextoBoasVindas = createContext<Contexto | null>(null);
 
+/**
+ * Android 11+: o pedido de "o tempo todo" abre direto os Ajustes do celular. Antes disso, o app explica o que o cliente
+ * vai ver e o que escolher.
+ */
+function explicarAjustesAndroid() {
+  return new Promise<boolean>((resolve) =>
+    Alert.alert(
+      'Aviso com o app fechado',
+      'O celular vai abrir os ajustes de localização. Escolha “Permitir o tempo todo” para receber as boas-vindas mesmo com o app ' +
+        'fechado. A localização não sai do celular.',
+      [
+        { text: 'Agora não', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'Abrir ajustes', onPress: () => resolve(true) },
+      ],
+      { cancelable: true, onDismiss: () => resolve(false) },
+    ),
+  );
+}
+
 export function ProvedorBoasVindas({ children }: { children: ReactNode }) {
-  const { lojas, entrar } = useFigital();
+  const { lojas, lojaAtual, entrar } = useFigital();
   const [ligado, setLigado] = useState(false);
   const [comAppFechado, setComAppFechado] = useState(false);
   const [saudacao, setSaudacao] = useState<LojaNoMapa>();
@@ -58,11 +79,25 @@ export function ProvedorBoasVindas({ children }: { children: ReactNode }) {
   const chegadas = useRef(new Map<string, number>());
 
   useEffect(() => {
-    ler<boolean>(CHAVE, false).then(setLigado);
+    (async () => {
+      if (!(await ler<boolean>(CHAVE, false))) return;
+      // A permissão pode ter sido tirada nos Ajustes com o app fechado: aí a chave da Conta volta a ficar desligada.
+      const permissao = await Location.getForegroundPermissionsAsync().catch(() => undefined);
+      if (permissao && !permissao.granted) {
+        gravar(CHAVE, false);
+        desligarSegundoPlano();
+        return;
+      }
+      setLigado(true);
+      setComAppFechado(await segundoPlanoLigado());
+    })();
   }, []);
 
   const saudar = useEffectEvent(async (loja: { slug: string; nome?: string }, abrirLoja: boolean) => {
+    // Já no modo desta loja (entrou pelo QR ou pelo botão): não interrompe a compra com o cartão nem com o tutorial.
+    const jaNaLoja = lojaAtual?.slug === loja.slug;
     entrar(loja.slug);
+    if (jaNaLoja && !abrirLoja) return;
     const nome = loja.nome ?? lojas.find((l) => l.slug === loja.slug)?.nome;
     if (!(await ler<boolean>(CHAVE_APRESENTADO, false))) {
       gravar(CHAVE_APRESENTADO, true);
@@ -145,6 +180,10 @@ export function ProvedorBoasVindas({ children }: { children: ReactNode }) {
         setLigado(true);
         gravar(CHAVE, true);
         if (temSegundoPlano) {
+          if (Platform.OS === 'android') {
+            const sempre = await Location.getBackgroundPermissionsAsync().catch(() => undefined);
+            if (!sempre?.granted && !(await explicarAjustesAndroid())) return true;
+          }
           const mapa = await lojasNoMapa(lojas);
           setComAppFechado(await ligarSegundoPlano(mapa).catch(() => false));
         }
@@ -155,6 +194,8 @@ export function ProvedorBoasVindas({ children }: { children: ReactNode }) {
         setComAppFechado(false);
         gravar(CHAVE, false);
         desligarSegundoPlano();
+        // Não deixa no celular a hora das visitas a cada loja nem avisos agendados.
+        limparBoasVindas();
       },
     }),
     [ligado, comAppFechado, lojas],
@@ -185,6 +226,8 @@ export function ProvedorBoasVindas({ children }: { children: ReactNode }) {
         </View>
       </Modal>
       <ComoFuncionaAutoatendimento
+        // Monta de novo a cada loja, para abrir na tela de boas-vindas (o passo inicial depende do nome da loja).
+        key={apresentacao?.slug ?? 'nenhuma'}
         visivel={Boolean(apresentacao)}
         nomeLoja={apresentacao?.nome ?? ''}
         aoFechar={() => setApresentacao(undefined)}

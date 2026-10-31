@@ -53,7 +53,12 @@ export function FreteCep({ valor }: { valor: number }) {
         ) : (
           <Texto>Ainda não entregamos nesse CEP. Você pode retirar numa das nossas lojas.</Texto>
         )}
-        <Pressable onPress={() => setEditando(true)} hitSlop={6}>
+        {/* Área de toque de 44 pt: o texto tem 18 e o hitSlop completa. */}
+        <Pressable
+          onPress={() => setEditando(true)}
+          hitSlop={{ top: 13, bottom: 13, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={cep ? `CEP ${formatarCep(cep)}. Trocar CEP` : 'Informar CEP'}>
           <Texto variante="rotulo" cor={cores.marca}>
             {cep ? `CEP ${formatarCep(cep)} · trocar` : 'Informar CEP'}
           </Texto>

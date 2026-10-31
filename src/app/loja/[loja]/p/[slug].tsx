@@ -11,13 +11,13 @@ import { AbasProduto } from '@/componentes/abas-produto';
 import { BarraCompra } from '@/componentes/barra-compra';
 import { Botao } from '@/componentes/botao';
 import { CabecalhoLoja } from '@/componentes/cabecalho-loja';
-import { Carregando, Erro } from '@/componentes/estado-tela';
+import { Aviso, Carregando, Erro } from '@/componentes/estado-tela';
 import { Galeria } from '@/componentes/galeria';
 import { Preco } from '@/componentes/preco';
 import { Texto } from '@/componentes/texto';
 import { useCarrinho } from '@/estado/carrinho';
 import { useConversas } from '@/estado/conversas';
-import { useFigital } from '@/estado/figital';
+import { useLojas } from '@/estado/figital';
 import { api } from '@/lib/api';
 import { arredondar, formatarPreco, nomeLegivel } from '@/lib/formatar';
 import { rotaCarrinhoLoja } from '@/lib/rotas';
@@ -59,7 +59,7 @@ function escolherSaida(outroLugar: 'cd' | 'outra-loja' | undefined, aceitar: () 
 export default function ProdutoNaLoja() {
   const { loja: slugLoja, slug } = useLocalSearchParams<{ loja: string; slug: string }>();
   const { width } = useWindowDimensions();
-  const { lojas } = useFigital();
+  const { lojas, erroLojas, tentarLojas } = useLojas();
   const { adicionar, itens } = useCarrinho();
   const { iniciar } = useConversas();
   const loja = lojas.find((l) => l.slug === slugLoja);
@@ -70,14 +70,21 @@ export default function ProdutoNaLoja() {
     [slugLoja, codprod],
   );
 
-  if (!loja || (!dados && carregando)) return <Carregando />;
-  if (!dados) return <Erro mensagem={erro ?? ''} tentar={recarregar} />;
+  if (!lojas.length) return erroLojas ? <Erro mensagem="Não conseguimos carregar as lojas." tentar={tentarLojas} /> : <Carregando />;
+  if (!loja) return <Aviso titulo="Loja não encontrada" acao="Voltar ao início" aoTocar={() => router.dismissTo('/')} triste />;
+  if (!dados)
+    return (
+      <>
+        <CabecalhoLoja loja={loja} titulo={carregando ? 'Abrindo produto…' : ''} />
+        {carregando ? <Carregando /> : <Erro mensagem={erro ?? ''} tentar={recarregar} />}
+      </>
+    );
   const { produto: p, origem } = dados;
   const nome = nomeLegivel(p.nome);
   const tabela = descontos?.itens.find((d) => d.codprod === p.codprod);
   const pixCaixa = tabela?.descontos.pix?.caixa ?? 0;
   const melhor = tabela ? Math.max(0, ...Object.values(tabela.descontos).map((d) => d.caixa)) : 0;
-  const item = { ...p, imagem: p.imagens[0]?.src, estoque: origem.disponivel, origemEstoque: origem.origem };
+  const item = { ...p, imagem: p.imagens[0]?.src, estoque: origem.disponivel, origemEstoque: origem.origem, entregavel: dados.entregavel };
   // Já no carrinho: a escolha (mostruário ou outro lugar) foi feita na primeira vez.
   const jaNoCarrinho = itens(loja.slug).some((i) => i.codprod === p.codprod);
 
@@ -109,10 +116,15 @@ export default function ProdutoNaLoja() {
             {p.marca} · etiqueta {p.codprod}
           </Texto>
           <Texto variante="titulo">{nome}</Texto>
+          {pixCaixa > 0 ? (
+            <Texto variante="rotulo" cor={cores.textoSuave}>
+              Pagando pelo app
+            </Texto>
+          ) : null}
           <Preco preco={p.preco} precoDe={p.precoDe} descontoPix={p.descontoPix} tamanho="pagina" />
           {pixCaixa > 0 ? (
             <View style={estilos.autoatendimento}>
-              <Texto variante="forte">{formatarPreco(arredondar(p.preco * (1 - pixCaixa / 100)))} no autoatendimento, no Pix</Texto>
+              <Texto variante="forte">No caixa da loja: {formatarPreco(arredondar(p.preco * (1 - pixCaixa / 100)))} no Pix ou dinheiro</Texto>
               <Texto variante="pequeno" cor={cores.textoSuave}>
                 {pct(pixCaixa)}% a menos pagando no caixa no Pix ou em dinheiro
                 {melhor > pixCaixa ? ` (até ${pct(melhor)}% conforme o pagamento)` : ''}. No crédito, o desconto muda com as parcelas.

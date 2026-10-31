@@ -27,13 +27,27 @@ export class ErroApi extends Error {
   }
 }
 
+/** Tempo máximo de uma chamada ao site. No Android o fetch não tem limite: sem isto, conexão travada gira para sempre. */
+const TEMPO_LIMITE = 15_000;
+
+/** fetch com tempo limite; tempo esgotado rejeita como falha de rede (vira ErroApi com status 0, "sem conexão"). */
+async function buscarComLimite(url: string, opcoes: RequestInit = {}, ms = TEMPO_LIMITE): Promise<Response> {
+  const controle = new AbortController();
+  const relogio = setTimeout(() => controle.abort(), ms);
+  try {
+    return await fetch(url, { ...opcoes, signal: controle.signal });
+  } finally {
+    clearTimeout(relogio);
+  }
+}
+
 async function obter<T>(caminho: string, params?: Record<string, string | undefined>): Promise<T> {
   const busca = new URLSearchParams();
   for (const [chave, valor] of Object.entries(params ?? {})) if (valor) busca.set(chave, valor);
   const url = `${SITE_URL}${caminho}${busca.size ? `?${busca}` : ''}`;
   let resposta: Response;
   try {
-    resposta = await fetch(url, { headers: { Accept: 'application/json', 'X-Canal': 'app' } });
+    resposta = await buscarComLimite(url, { headers: { Accept: 'application/json', 'X-Canal': 'app' } });
   } catch {
     throw new ErroApi(0, 'Sem conexão. Confira a internet e tente de novo.');
   }
@@ -47,16 +61,29 @@ async function obter<T>(caminho: string, params?: Record<string, string | undefi
 export const api = {
   inicio: () => obter<Inicio>('/api/app/inicio'),
   departamentos: () => obter<Departamento[]>('/api/app/departamentos'),
-  produtos: (filtro: { departamento?: string; categoria?: string; ordenacao?: string; oferta?: boolean; codprods?: string[] }) =>
+  produtos: (filtro: {
+    departamento?: string;
+    categoria?: string;
+    /** Vitrine do início (/colecao/{slug}); lista vazia se ela não estiver no ar. */
+    colecao?: string;
+    ordenacao?: string;
+    oferta?: boolean;
+    codprods?: string[];
+  }) =>
     obter<CardProduto[]>('/api/app/produtos', {
       departamento: filtro.departamento,
       categoria: filtro.categoria,
+      colecao: filtro.colecao,
       ordenacao: filtro.ordenacao,
       oferta: filtro.oferta ? '1' : undefined,
       codprod: filtro.codprods?.join(','),
     }),
   produto: (slug: string) =>
-    obter<{ produto: Produto; combinaCom: CardProduto[]; pagamento: Pagamento }>(`/api/app/produtos/${encodeURIComponent(slug)}`),
+    obter<
+      | { produto: Produto; combinaCom: CardProduto[]; pagamento: Pagamento; redirecionar?: undefined }
+      // Endereço antigo ou renomeado: o site manda o caminho novo (como o 301 da página).
+      | { redirecionar: string; produto?: undefined; combinaCom?: undefined; pagamento?: undefined }
+    >(`/api/app/produtos/${encodeURIComponent(slug)}`),
   busca: (termo: string, ordenacao?: string) => obter<ResultadoBusca>('/api/app/busca', { q: termo, ordenacao }),
   sugestoes: (termo: string) =>
     obter<{ produtos: { nome: string; href: string; preco: number; imagem?: string }[]; categorias: { nome: string; href: string }[] }>(
@@ -76,12 +103,15 @@ export const api = {
 export const imagemSemFoto = `${SITE_URL}/img/sem-foto.svg`;
 
 export type CotacaoFrete =
-  | { atendido: true; cotacao: { faixa: string; valor: number; prazo: string }; endereco?: { cidade: string; uf: string; bairro: string } }
-  | { atendido: false; endereco?: { cidade: string; uf: string; bairro: string } };
+  | { atendido: true; cotacao: { faixa: string; valor: number; prazo: string }; endereco?: EnderecoCep }
+  | { atendido: false; endereco?: EnderecoCep };
+
+/** Endereço do CEP (ViaCEP pelo site). CEP geral de cidade vem sem rua e sem bairro: aí o cliente digita. */
+export type EnderecoCep = { cidade: string; uf: string; bairro: string; logradouro?: string };
 
 /** Frete pelo CEP (produto e checkout), pela regra do Sankhya. O valor final sai do servidor no pedido. */
 export async function cotarFrete(cep: string, valorNota: number): Promise<CotacaoFrete> {
-  const resposta = await fetch(`${SITE_URL}/api/app/frete`, {
+  const resposta = await buscarComLimite(`${SITE_URL}/api/app/frete`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Canal': 'app' },
     body: JSON.stringify({ cep: cep.replace(/\D/g, ''), valorNota }),
@@ -112,7 +142,7 @@ export async function consultarRetirada(
   itens: { codprod: string; quantidade: number }[],
   { cep, preferida }: { cep?: string; preferida?: string } = {},
 ): Promise<ResultadoRetirada> {
-  const resposta = await fetch(`${SITE_URL}/api/app/retirada`, {
+  const resposta = await buscarComLimite(`${SITE_URL}/api/app/retirada`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Canal': 'app' },
     body: JSON.stringify({ itens, cep: cep?.replace(/\D/g, '') || undefined, preferida }),

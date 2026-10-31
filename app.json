@@ -17,10 +17,7 @@
         "applinks:loja-casacontente.onrender.com"
       ],
       "infoPlist": {
-        "NSCameraUsageDescription": "A câmera lê o QR code das etiquetas e o código de barras dos produtos na loja.",
-        "UIBackgroundModes": [
-          "location"
-        ]
+        "NSCameraUsageDescription": "A câmera lê o QR code das etiquetas e o código de barras dos produtos na loja."
       }
     },
     "android": {
@@ -75,8 +72,9 @@
         {
           "locationWhenInUsePermission": "A localização serve para o app dar boas-vindas quando você chega numa loja Casa Contente. Ela fica só no celular.",
           "locationAlwaysAndWhenInUsePermission": "Com o app fechado, a localização serve para avisar quando você passar 2 minutos numa loja Casa Contente. Ela fica só no celular e você desliga na Conta.",
-          "isIosBackgroundLocationEnabled": true,
-          "isAndroidBackgroundLocationEnabled": true
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": false
         }
       ],
       [

@@ -3,9 +3,11 @@
 // Nesta versão de demonstração as conversas ficam no celular e a loja responde com uma mensagem automática; com o
 // backend, as mensagens vão para a seção de conversas do contrato da API (entrega em tempo real e aviso no celular).
 
+import * as Notifications from 'expo-notifications';
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { gravar, ler } from '@/lib/armazenamento';
+import { formatarHora } from '@/lib/formatar';
 import type { CardProduto } from '@/lib/tipos';
 
 export type Mensagem = {
@@ -39,14 +41,79 @@ type Contexto = {
   conversas: Conversa[];
   naoLidas: number;
   iniciar: (inicio: Inicio) => string;
+  /** Não grava texto com número de cartão (veja pareceCartao). */
   enviar: (id: string, texto: string) => void;
   marcarLida: (id: string) => void;
+  /** Apaga todas as conversas do celular (ao sair da conta). */
+  limpar: () => void;
 };
 
 const CHAVE = 'conversas:v1';
 const ContextoConversas = createContext<Contexto | null>(null);
 const novoId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const agora = () => new Date().toISOString();
+
+/** Mensagem mostrada quando o texto parece ter número de cartão. */
+export const AVISO_CARTAO = 'Por segurança, não mande dados do cartão aqui. Peça ao vendedor um link de pagamento.';
+
+function passaLuhn(digitos: string) {
+  let soma = 0;
+  for (let i = 0; i < digitos.length; i++) {
+    let d = Number(digitos[digitos.length - 1 - i]);
+    if (i % 2 === 1) {
+      d *= 2;
+      if (d > 9) d -= 9;
+    }
+    soma += d;
+  }
+  return soma % 10 === 0;
+}
+
+/**
+ * true se o texto tem um número de cartão: 13 a 19 dígitos (com espaço, ponto ou traço entre eles) que passam no teste
+ * de Luhn. Confere a sequência inteira e cada começo dela formado por grupos inteiros, para pegar também
+ * "5502 0912 3456 7890 123" (cartão seguido do CVV). O cartão nunca pode ficar gravado na conversa (PCI).
+ */
+export function pareceCartao(texto: string) {
+  for (const [sequencia] of texto.matchAll(/\d(?:[ .-]?\d)*/g)) {
+    const grupos = sequencia.split(/[ .-]/);
+    const candidatos = [grupos.join('')];
+    for (let i = 1; i < grupos.length; i++) candidatos.push(grupos.slice(0, i).join(''));
+    if (candidatos.some((c) => c.length >= 13 && c.length <= 19 && /^[2-6]/.test(c) && passaLuhn(c))) return true;
+  }
+  return false;
+}
+
+const FUSO = 'America/Belem';
+const dia = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: FUSO });
+
+/** 'Hoje', 'Ontem' ou a data (dd/mm, com o ano se não for o atual), no fuso das lojas. Separa os balões por dia. */
+export function rotuloDia(iso: string) {
+  const data = dia.format(new Date(iso));
+  const agoraMs = Date.now();
+  const hoje = dia.format(new Date(agoraMs));
+  if (data === hoje) return 'Hoje';
+  if (data === dia.format(new Date(agoraMs - 24 * 60 * 60 * 1000))) return 'Ontem';
+  return data.slice(6) === hoje.slice(6) ? data.slice(0, 5) : data;
+}
+
+/** Hora se for hoje; senão 'Ontem' ou a data. Usado na lista de conversas. */
+export function formatarQuando(iso: string) {
+  const rotulo = rotuloDia(iso);
+  return rotulo === 'Hoje' ? formatarHora(iso) : rotulo;
+}
+
+/** Permissão de aviso no celular já concedida (sem ela, a conversa não promete aviso). */
+export async function avisosPermitidos() {
+  try {
+    return (await Notifications.getPermissionsAsync()).granted;
+  } catch {
+    return false;
+  }
+}
+
+/** Produto com que a conversa começou (cartão mandado pelo cliente ao abrir a conversa pelo produto). */
+const produtoInicial = (c: Conversa) => (c.mensagens[0]?.de === 'cliente' ? c.mensagens[0].produto?.codprod : undefined);
 
 const naoLida = (c: Conversa) => c.mensagens.some((m) => m.de === 'loja' && (!c.lidaEm || m.em > c.lidaEm));
 
@@ -73,34 +140,47 @@ export function ProvedorConversas({ children }: { children: ReactNode }) {
     const responderDemonstracao = (id: string, nomeLoja: string) => {
       if (respostas.current.has(id)) return;
       respostas.current.add(id);
-      setTimeout(
-        () =>
-          acrescentar(id, {
-            id: novoId(),
-            de: 'loja',
-            em: agora(),
-            autor: `Equipe ${nomeLoja}`,
-            texto: `Oi! Recebemos sua mensagem e um vendedor da ${nomeLoja} já vai responder por aqui. Você recebe um aviso no celular quando chegar.`,
-          }),
-        1200,
-      );
+      setTimeout(async () => {
+        const aviso = (await avisosPermitidos()) ? 'Você recebe um aviso no celular quando chegar.' : 'Volte aqui para ver a resposta.';
+        acrescentar(id, {
+          id: novoId(),
+          de: 'loja',
+          em: agora(),
+          autor: `Equipe ${nomeLoja}`,
+          texto: `Oi! Recebemos sua mensagem e um vendedor da ${nomeLoja} já vai responder por aqui. ${aviso}`,
+        });
+      }, 1200);
     };
 
     return {
       conversas,
       naoLidas: conversas.filter(naoLida).length,
       iniciar: ({ produto, ...inicio }) => {
+        // Reaproveita a conversa com a mesma loja, o mesmo assunto, o mesmo pedido e o mesmo produto: cada toque em
+        // "conversar" não cria outra conversa vazia (nem, com o backend, outro atendimento na fila do vendedor).
+        const mesma = (c: Conversa) =>
+          c.loja === inicio.loja && c.assunto === inicio.assunto && c.pedido === inicio.pedido && produtoInicial(c) === produto?.codprod;
+        const existente = conversas.find(mesma);
+        if (existente) return existente.id;
         const id = novoId();
         const mensagens: Mensagem[] = produto ? [{ id: novoId(), de: 'cliente', em: agora(), produto }] : [];
         setConversas((lista) => [{ id, ...inicio, mensagens }, ...lista]);
         return id;
       },
       enviar: (id, texto) => {
+        // A tela já recusa e explica; aqui é a garantia de que nenhum caminho grava cartão no celular.
+        if (pareceCartao(texto)) return;
         const conversa = conversas.find((c) => c.id === id);
         acrescentar(id, { id: novoId(), de: 'cliente', em: agora(), texto });
         if (conversa) responderDemonstracao(id, conversa.nomeLoja);
       },
       marcarLida: (id) => setConversas((lista) => lista.map((c) => (c.id === id ? { ...c, lidaEm: agora() } : c))),
+      // O efeito acima grava a lista vazia em conversas:v1. Com o backend, sair também desliga o aparelho
+      // (DELETE /clientes/eu/aparelhos, contrato 38.2).
+      limpar: () => {
+        respostas.current.clear();
+        setConversas([]);
+      },
     };
   }, [conversas]);
 

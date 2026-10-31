@@ -10,25 +10,29 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Botao } from '@/componentes/botao';
 import { Aviso } from '@/componentes/estado-tela';
 import { Texto } from '@/componentes/texto';
-import { useConversas } from '@/estado/conversas';
+import { formatarQuando, useConversas, type Conversa } from '@/estado/conversas';
 import { useFigital } from '@/estado/figital';
-import { formatarHora } from '@/lib/formatar';
 import { cores, raio } from '@/lib/tema';
+
+const ultimaEm = (c: Conversa) => c.mensagens.at(-1)?.em ?? '';
 
 export default function Conversas() {
   const { conversas } = useConversas();
   const [nova, setNova] = useState(false);
+  const baixo = useSafeAreaInsets().bottom;
+  // Conversa aberta e deixada sem nenhuma mensagem não entra na lista; a que recebeu mensagem por último fica no topo.
+  const lista = conversas.filter((c) => c.mensagens.length).sort((a, b) => ultimaEm(b).localeCompare(ultimaEm(a)));
   return (
     <>
       <Stack.Screen options={{ title: 'Conversas' }} />
-      <ScrollView contentContainerStyle={estilos.conteudo}>
-        {!conversas.length ? (
+      <ScrollView contentContainerStyle={[estilos.conteudo, { paddingBottom: 120 + baixo }]}>
+        {!lista.length ? (
           <Aviso
             titulo="Fale com a gente por aqui"
             texto="Tire dúvidas sobre medidas, entrega e garantia com um vendedor, sem sair do app."
           />
         ) : (
-          conversas.map((c) => {
+          lista.map((c) => {
             const ultima = c.mensagens.at(-1);
             const nova = ultima?.de === 'loja' && (!c.lidaEm || ultima.em > c.lidaEm);
             return (
@@ -41,7 +45,7 @@ export default function Conversas() {
                     <Texto variante="forte">{c.loja ? `Loja ${c.nomeLoja}` : c.nomeLoja}</Texto>
                     {ultima ? (
                       <Texto variante="pequeno" cor={cores.textoSuave}>
-                        {formatarHora(ultima.em)}
+                        {formatarQuando(ultima.em)}
                       </Texto>
                     ) : null}
                   </View>
@@ -105,7 +109,7 @@ function GavetaNovaConversa({ aberta, fechar }: { aberta: boolean; fechar: () =>
 }
 
 const estilos = StyleSheet.create({
-  conteudo: { padding: 16, gap: 10, paddingBottom: 120 },
+  conteudo: { padding: 16, gap: 10 },
   conversa: { flexDirection: 'row', gap: 12, alignItems: 'center', padding: 14, borderRadius: raio.l, backgroundColor: cores.superficie, borderWidth: 1, borderColor: cores.borda },
   avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: cores.marca, alignItems: 'center', justifyContent: 'center' },
   ponto: { width: 10, height: 10, borderRadius: 5, backgroundColor: cores.marca },

@@ -1,26 +1,28 @@
 // Início: o que a home do site mostra, no formato do celular. Banners com arte do admin e os 4 banners automáticos do
 // dia no carrossel, departamentos, achados de hoje, os 2 banners automáticos fixos, compre por ambiente e as vitrines.
 
-import { router } from 'expo-router';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { setStatusBarStyle } from 'expo-status-bar';
+import * as WebBrowser from 'expo-web-browser';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { BannerAutomatico } from '@/componentes/banner-automatico';
 import { Cabecalho } from '@/componentes/cabecalho';
+import { CardProduto } from '@/componentes/card-produto';
 import { Carrossel } from '@/componentes/carrossel';
 import { Carregando, Erro } from '@/componentes/estado-tela';
 import { Imagem } from '@/componentes/imagem';
 import { MenuDaLoja } from '@/componentes/menu-da-loja';
 import { Prateleira } from '@/componentes/prateleira';
 import { Texto } from '@/componentes/texto';
+import { useDefinirRegraPagamento } from '@/estado/pagamento';
 import { api, SITE_URL } from '@/lib/api';
 import { rotaCategoria, rotaDepartamento, rotaInterna } from '@/lib/rotas';
 import { cores, raio } from '@/lib/tema';
 import type { BannerArte, Departamento } from '@/lib/tipos';
 import { useDados } from '@/lib/use-dados';
 import { useMaisProdutos } from '@/lib/use-mais-produtos';
-import { CardProduto } from '@/componentes/card-produto';
-import { ActivityIndicator } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 
 const AMBIENTES = [
   { nome: 'Sala', imagem: 'sala', departamento: 'moveis', categorias: ['sofas', 'sofa', 'poltronas', 'rack'], cor: '#e9dccb' },
@@ -41,6 +43,13 @@ function abrirLink(link: string) {
   else WebBrowser.openBrowserAsync(link);
 }
 
+/** Ícone de departamento: a ilustração que o site manda (ou a do slug) e, se não carregar, a padrão do site. */
+function IconeDepartamento({ departamento: d }: { departamento: Departamento }) {
+  const [falhou, setFalhou] = useState(false);
+  const uri = falhou ? `${SITE_URL}/img/categorias/padrao.svg` : (d.ilustracao ?? `${SITE_URL}/img/categorias/${d.slug}.svg`);
+  return <Imagem uri={uri} style={{ width: 44, height: 44 }} onError={() => setFalhou(true)} />;
+}
+
 function BannerComArte({ banner, largura, altura }: { banner: BannerArte; largura: number; altura: number }) {
   return (
     <Pressable onPress={() => abrirLink(banner.link)} accessibilityRole="link" accessibilityLabel={banner.alt}>
@@ -57,6 +66,21 @@ export default function Inicio() {
   const mais = useMaisProdutos(dados?.departamentos ?? [], jaNaTela);
   const larguraCard = (largura - 12) / 2;
 
+  // Cards, banners e checkout usam a regra de parcelas do site (Admin > Parâmetros).
+  const definirRegra = useDefinirRegraPagamento();
+  const pagamento = dados?.pagamento;
+  useEffect(() => {
+    definirRegra(pagamento);
+  }, [definirRegra, pagamento]);
+
+  // Topo vermelho: hora e bateria em branco só enquanto o início está na tela.
+  useFocusEffect(
+    useCallback(() => {
+      setStatusBarStyle('light');
+      return () => setStatusBarStyle('dark');
+    }, []),
+  );
+
   return (
     <View style={estilos.tela}>
       <Cabecalho />
@@ -72,8 +96,18 @@ export default function Inicio() {
             if (n.contentOffset.y + n.layoutMeasurement.height > n.contentSize.height - 800) mais.carregarMais();
           }}
           scrollEventThrottle={250}
-          refreshControl={<RefreshControl refreshing={carregando} onRefresh={recarregar} tintColor={cores.marca} />}>
-          <MenuDaLoja />
+          refreshControl={
+            <RefreshControl
+              refreshing={carregando}
+              onRefresh={() => {
+                recarregar();
+                // Novo sorteio no "Mais para você", que volta a carregar com a rolagem.
+                mais.reiniciar();
+              }}
+              tintColor={cores.marca}
+            />
+          }>
+          <MenuDaLoja departamentos={dados.departamentos} />
           <View style={{ marginTop: 16 }}>
             <Carrossel largura={largura}>
               {[
@@ -87,9 +121,14 @@ export default function Inicio() {
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={estilos.departamentos}>
             {dados.departamentos.map((d) => (
-              <Pressable key={d.slug} style={estilos.departamento} onPress={() => router.push(rotaDepartamento(d.slug) as never)}>
+              <Pressable
+                key={d.slug}
+                style={estilos.departamento}
+                onPress={() => router.push(rotaDepartamento(d.slug) as never)}
+                accessibilityRole="link"
+                accessibilityLabel={d.nome}>
                 <View style={estilos.iconeDepartamento}>
-                  <Imagem uri={`${SITE_URL}/img/categorias/${d.slug}.svg`} style={{ width: 44, height: 44 }} />
+                  <IconeDepartamento departamento={d} />
                 </View>
                 <Texto variante="pequeno" numberOfLines={2} style={{ textAlign: 'center', fontSize: 12 }}>
                   {d.nome}
@@ -132,7 +171,7 @@ export default function Inicio() {
           </View>
 
           {dados.vitrines.map((v) => (
-            <Prateleira key={v.slug} titulo={v.nome} produtos={v.produtos} />
+            <Prateleira key={v.slug} titulo={v.nome} produtos={v.produtos} verTudo={`/colecao/${v.slug}?nome=${encodeURIComponent(v.nome)}`} />
           ))}
 
           {mais.produtos.length > 0 && (

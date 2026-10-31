@@ -2,7 +2,7 @@
 // API (docs/CONTRATO-API.md); quando o backend completo existir, os formatos continuam os mesmos.
 
 export type Categoria = { slug: string; nome: string };
-export type Departamento = { slug: string; nome: string; descricao?: string; categorias: Categoria[] };
+export type Departamento = { slug: string; nome: string; descricao?: string; categorias: Categoria[]; ilustracao?: string };
 
 export type CorSelo = 'marca' | 'sorriso' | 'escuro' | 'verde';
 export type SeloProduto = { texto: string; cor: CorSelo | string };
@@ -41,7 +41,13 @@ export type Produto = Omit<CardProduto, 'imagem'> & {
   vendeIndividualmente?: boolean;
 };
 
-export type Pagamento = { maxParcelas: number; parcelaMinima: number; maiorPercentualPix?: number };
+export type Pagamento = {
+  maxParcelas: number;
+  parcelaMinima: number;
+  maiorPercentualPix?: number;
+  /** Mínimo de cada forma no pagamento em mais de uma forma (Parâmetros do admin). */
+  minimoPorParte?: number;
+};
 
 export type BannerArte = { id: string; nome: string; imagem?: string; alt: string; link: string };
 
@@ -104,11 +110,12 @@ export type DescontoFigital = {
 
 export type ProdutoFigital = {
   produto: Produto;
-  estoqueCD: number;
-  estoqueLoja: number;
+  /** O site pode deixar de mandar as quantidades (o app só mostra a solução de compra, nunca o número). */
+  estoqueCD?: number;
+  estoqueLoja?: number;
   publicadoNoSite: boolean;
   entregavel: boolean;
   origem: OrigemEstoque;
 };
 
-export type Exposto = CardProduto & { estoqueCD: number; estoqueLoja: number };
+export type Exposto = CardProduto & { estoqueCD?: number; estoqueLoja?: number };

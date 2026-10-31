@@ -4,6 +4,7 @@
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { useRegraPagamento } from '@/estado/pagamento';
 import { calcularParcelas, formatarPreco, nomeLegivel } from '@/lib/formatar';
 import { rotaProduto } from '@/lib/rotas';
 import { cores, fontes, raio } from '@/lib/tema';
@@ -11,6 +12,9 @@ import type { BannerAutomatico as Dados } from '@/lib/tipos';
 import { Imagem } from './imagem';
 import { Sorriso } from './logo';
 import { Texto } from './texto';
+
+/** Letra do sistema muito grande cortaria o preço e o botão: o banner acompanha até 1,3x e cresce na altura. */
+const ESCALA_MAXIMA = 1.3;
 
 const TEXTOS = {
   oferta: { olho: 'Oferta da semana', botao: 'Ver oferta' },
@@ -23,14 +27,17 @@ export function BannerAutomatico({ banner, largura, formato }: { banner: Dados; 
   const tinta = oferta ? '#fff' : cores.texto;
   const fixo = formato === 'fixo';
   const altura = fixo ? largura * 0.58 : largura * 0.9;
-  const parcelas = calcularParcelas(p.preco);
+  const regra = useRegraPagamento();
+  const parcelas = calcularParcelas(p.preco, regra);
+  // No vermelho da oferta, texto pequeno só em branco puro (amarelo e branco translúcido ficam abaixo de 4,5:1).
+  const suave = oferta ? '#fff' : cores.textoSuave;
   const nome = nomeLegivel(p.nome);
   return (
     <Pressable
       onPress={() => router.push(rotaProduto(p) as never)}
       accessibilityRole="link"
       accessibilityLabel={`${TEXTOS[modelo].olho}: ${nome} por ${formatarPreco(p.preco)}`}
-      style={[estilos.banner, { width: largura, height: altura, backgroundColor: oferta ? cores.marca : cores.creme }]}>
+      style={[estilos.banner, { width: largura, minHeight: altura, backgroundColor: oferta ? cores.marca : cores.creme }]}>
       <View
         style={[
           estilos.bola,
@@ -49,45 +56,55 @@ export function BannerAutomatico({ banner, largura, formato }: { banner: Dados; 
       </View>
       {banner.desconto > 0 && (
         <View style={[estilos.selo, { width: largura * 0.17, height: largura * 0.17, borderRadius: largura }]}>
-          <Texto style={[estilos.seloNumero, { fontSize: largura * 0.05 }]}>{banner.desconto}%</Texto>
-          <Texto style={[estilos.seloOff, { fontSize: largura * 0.028 }]}>OFF</Texto>
+          <Texto style={[estilos.seloNumero, { fontSize: largura * 0.05 }]} maxFontSizeMultiplier={1}>
+            {banner.desconto}%
+          </Texto>
+          <Texto style={[estilos.seloOff, { fontSize: largura * 0.028 }]} maxFontSizeMultiplier={1}>
+            OFF
+          </Texto>
         </View>
       )}
       {/* Texto numa coluna própria à esquerda, sem nada por cima: o sorriso fica pequeno acima do título. */}
       <View style={[estilos.coluna, { width: largura * 0.5 - 18 }]}>
         <View style={{ gap: 4 }}>
           <Sorriso largura={36} cor={oferta ? cores.sorriso : cores.marca} />
-          <Texto style={[estilos.olho, { color: oferta ? cores.sorriso : cores.marca }]}>{TEXTOS[modelo].olho}</Texto>
+          <Texto style={[estilos.olho, { color: oferta ? '#fff' : cores.marca }]} maxFontSizeMultiplier={ESCALA_MAXIMA}>
+            {TEXTOS[modelo].olho}
+          </Texto>
           <Texto
             numberOfLines={fixo ? 2 : 3}
+            maxFontSizeMultiplier={ESCALA_MAXIMA}
             style={[estilos.nome, { color: tinta, fontSize: fixo || nome.length > 30 ? 17 : 22, lineHeight: fixo || nome.length > 30 ? 21 : 26 }]}>
             {nome}
           </Texto>
           {!fixo && p.marca ? (
-            <Texto variante="pequeno" numberOfLines={1} cor={oferta ? 'rgba(255,255,255,0.8)' : cores.textoSuave}>
+            <Texto variante="pequeno" numberOfLines={1} cor={suave} maxFontSizeMultiplier={ESCALA_MAXIMA}>
               {p.marca}
             </Texto>
           ) : null}
         </View>
         <View style={{ gap: 2 }}>
           {p.precoDe && p.precoDe > p.preco ? (
-            <Texto variante="pequeno" cor={oferta ? 'rgba(255,255,255,0.85)' : cores.textoSuave}>
-              de <Texto variante="pequeno" style={{ textDecorationLine: 'line-through' }} cor={oferta ? 'rgba(255,255,255,0.85)' : cores.textoSuave}>{formatarPreco(p.precoDe)}</Texto>
+            <Texto variante="pequeno" cor={suave} maxFontSizeMultiplier={ESCALA_MAXIMA}>
+              de{' '}
+              <Texto variante="pequeno" style={{ textDecorationLine: 'line-through' }} cor={suave}>
+                {formatarPreco(p.precoDe)}
+              </Texto>
             </Texto>
           ) : null}
-          <Texto style={[estilos.preco, { color: tinta }]}>
+          <Texto style={[estilos.preco, { color: tinta }]} maxFontSizeMultiplier={ESCALA_MAXIMA}>
             <Texto style={estilos.por} cor={tinta}>
               por{' '}
             </Texto>
             {formatarPreco(p.preco)}
           </Texto>
           {!fixo && parcelas.quantidade > 1 && (
-            <Texto variante="pequeno" cor={oferta ? 'rgba(255,255,255,0.85)' : cores.textoSuave}>
+            <Texto variante="pequeno" cor={suave} maxFontSizeMultiplier={ESCALA_MAXIMA}>
               {parcelas.quantidade}x de {formatarPreco(parcelas.valor)}
             </Texto>
           )}
           <View style={[estilos.botao, { backgroundColor: oferta ? cores.sorriso : cores.marca }]}>
-            <Texto style={estilos.botaoTexto} cor={oferta ? cores.texto : '#fff'}>
+            <Texto style={estilos.botaoTexto} cor={oferta ? cores.texto : '#fff'} maxFontSizeMultiplier={ESCALA_MAXIMA}>
               {TEXTOS[modelo].botao}
             </Texto>
           </View>

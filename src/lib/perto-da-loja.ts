@@ -137,3 +137,23 @@ export async function desligarSegundoPlano() {
   if (!temSegundoPlano) return;
   if (await Location.hasStartedGeofencingAsync(TAREFA).catch(() => false)) await Location.stopGeofencingAsync(TAREFA);
 }
+
+/** Diz se o aviso com o app fechado está de pé (a cerca virtual continua ligada depois de fechar e abrir o app). */
+export async function segundoPlanoLigado() {
+  if (!temSegundoPlano) return false;
+  return Location.hasStartedGeofencingAsync(TAREFA).catch(() => false);
+}
+
+/**
+ * Ao desligar as boas-vindas: apaga do celular a hora das visitas a cada loja e a lista da cerca virtual, e cancela os
+ * avisos que estavam agendados. Fica fora do desligarSegundoPlano, porque a hora também é gravada com o app aberto.
+ */
+export async function limparBoasVindas() {
+  const lojas = await ler<LojaNoMapa[]>(CHAVE_LOJAS, []);
+  const saudadas = await ler<Record<string, number>>(CHAVE_SAUDADAS, {});
+  const slugs = new Set([...lojas.map((l) => l.slug), ...Object.keys(saudadas)]);
+  if (Platform.OS !== 'web')
+    await Promise.all([...slugs].map((slug) => Notifications.cancelScheduledNotificationAsync(idAviso(slug)).catch(() => undefined)));
+  await gravar(CHAVE_SAUDADAS, {});
+  await gravar(CHAVE_LOJAS, []);
+}

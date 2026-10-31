@@ -3,7 +3,8 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useConta } from '@/estado/conta';
-import { descontoExibido, nomeLegivel } from '@/lib/formatar';
+import { useRegraPagamento } from '@/estado/pagamento';
+import { descontoExibido, formatarPreco, nomeLegivel } from '@/lib/formatar';
 import { rotaProduto } from '@/lib/rotas';
 import { cores, raio } from '@/lib/tema';
 import type { CardProduto as Dados } from '@/lib/tipos';
@@ -17,12 +18,27 @@ export function CardProduto({ produto, largura, href }: { produto: Dados; largur
   const { favorito, alternarFavorito } = useConta();
   const desconto = descontoExibido(produto);
   const marcado = favorito(produto.codprod);
+  const regra = useRegraPagamento();
+  const disponivel = produto.estoque > 0;
+  // O rótulo substitui o conteúdo para o leitor de tela: nome legível, preço (ou esgotado) e desconto.
+  const rotulo = [
+    nomeLegivel(produto.nome),
+    disponivel ? formatarPreco(produto.preco) : 'esgotado',
+    desconto > 0 ? `${desconto}% de desconto` : '',
+  ]
+    .filter(Boolean)
+    .join(', ');
   return (
       <Pressable
         onPress={() => router.push((href ?? rotaProduto(produto)) as never)}
         accessibilityRole="link"
         style={[estilos.card, largura ? { width: largura } : { flex: 1 }]}
-        accessibilityLabel={produto.nome}>
+        accessibilityLabel={rotulo}
+        // No iPhone o VoiceOver não chega ao coração dentro do card: o favorito vira uma ação do próprio card.
+        accessibilityActions={[{ name: 'favorito', label: marcado ? 'Tirar dos favoritos' : 'Guardar nos favoritos' }]}
+        onAccessibilityAction={(e) => {
+          if (e.nativeEvent.actionName === 'favorito') alternarFavorito(produto.codprod);
+        }}>
         <View style={estilos.foto}>
           <Imagem uri={produto.imagem} style={estilos.imagem} accessibilityIgnoresInvertColors />
           <View style={estilos.selos}>
@@ -45,8 +61,8 @@ export function CardProduto({ produto, largura, href }: { produto: Dados; largur
           <Texto variante="rotulo" numberOfLines={2} style={estilos.nome}>
             {nomeLegivel(produto.nome)}
           </Texto>
-          {produto.estoque > 0 ? (
-            <Preco preco={produto.preco} precoDe={produto.precoDe} descontoPix={produto.descontoPix} />
+          {disponivel ? (
+            <Preco preco={produto.preco} precoDe={produto.precoDe} descontoPix={produto.descontoPix} pagamento={regra} />
           ) : (
             <Texto variante="forte" cor={cores.textoSuave}>
               Esgotado
