@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { router, Stack, useIsFocused, useLocalSearchParams } from 'expo-router';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { AppState, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Aviso } from '@/componentes/estado-tela';
@@ -115,9 +115,15 @@ export default function ConversaTela() {
     const t = setTimeout(() => rolagem.current?.scrollToEnd({ animated: true }), 50);
     return () => clearTimeout(t);
   }, [quantidade]);
-  // Só promete aviso no celular com a permissão concedida (confere de novo ao voltar para a tela).
+  // Só promete aviso no celular com a permissão concedida. Confere de novo ao voltar para a tela e ao voltar dos ajustes
+  // do celular (o app volta a 'active'), para o "Ativar avisos" sumir depois que o cliente liga lá.
   useEffect(() => {
-    if (focada) avisosPermitidos().then(setAvisos);
+    if (!focada) return;
+    avisosPermitidos().then(setAvisos);
+    const ouvinte = AppState.addEventListener('change', (estado) => {
+      if (estado === 'active') avisosPermitidos().then(setAvisos);
+    });
+    return () => ouvinte.remove();
   }, [focada]);
 
   if (!conversa) return <Aviso titulo="Conversa não encontrada" acao="Ver conversas" aoTocar={() => router.replace('/conversas')} />;

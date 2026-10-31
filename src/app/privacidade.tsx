@@ -16,6 +16,7 @@ const GUARDADO = [
   'Favoritos e CEP',
   'Carrinho do site e das lojas',
   'Loja em que você está (sai sozinha depois de 4 horas)',
+  'Comprovante da compra para pagar no caixa da loja: número, itens, total, desconto e forma de pagamento (sai sozinho quando a reserva vence)',
   'Conversas com a loja',
   'Buscas recentes',
   'Com as boas-vindas ligadas: as lojas em que você esteve e quando, para não repetir o cumprimento',

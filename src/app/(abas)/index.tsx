@@ -1,10 +1,10 @@
 // Início: o que a home do site mostra, no formato do celular. Banners com arte do admin e os 4 banners automáticos do
 // dia no carrossel, departamentos, achados de hoje, os 2 banners automáticos fixos, compre por ambiente e as vitrines.
 
-import { router, useFocusEffect } from 'expo-router';
-import { setStatusBarStyle } from 'expo-status-bar';
+import { router, useIsFocused } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { BannerAutomatico } from '@/componentes/banner-automatico';
@@ -73,16 +73,13 @@ export default function Inicio() {
     definirRegra(pagamento);
   }, [definirRegra, pagamento]);
 
-  // Topo vermelho: hora e bateria em branco só enquanto o início está na tela.
-  useFocusEffect(
-    useCallback(() => {
-      setStatusBarStyle('light');
-      return () => setStatusBarStyle('dark');
-    }, []),
-  );
+  // Topo vermelho: hora e bateria em branco só enquanto o início está na tela. Declarativa, para ficar por cima da
+  // "dark" da raiz na pilha de StatusBar (setStatusBarStyle avulso era desfeito por ela).
+  const focado = useIsFocused();
 
   return (
     <View style={estilos.tela}>
+      {focado && <StatusBar style="light" />}
       <Cabecalho />
       {!dados && carregando ? (
         <Carregando />

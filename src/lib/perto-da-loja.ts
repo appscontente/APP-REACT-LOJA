@@ -7,32 +7,22 @@
 // - App fechado (só no app instalado de verdade, não no Expo Go): o celular avisa quando entra no raio da loja; o app
 //   agenda um aviso para dali a 2 minutos e cancela se a pessoa sair antes.
 
-import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
-import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 
 import { gravar, ler } from './armazenamento';
+import { CHAVE_LOJAS, CHAVE_SAUDADAS, TAREFA, idAviso, temSegundoPlano, type LojaNoMapa, type Ponto } from './tarefa-boas-vindas';
 import type { LojaFisica } from './tipos';
+
+// A tarefa com o app fechado mora em tarefa-boas-vindas.ts (carregada pelo index.js antes das telas); daqui saem as
+// mesmas regras para quem já importava deste arquivo.
+export { PERMANENCIA_MS, idAviso, jaSaudou, marcarSaudada, temSegundoPlano, type LojaNoMapa, type Ponto } from './tarefa-boas-vindas';
 
 /** Raio em volta da loja. O iPhone não avisa com precisão abaixo de ~100 m. */
 export const RAIO_M = 120;
-/** Quanto tempo perto da loja até as boas-vindas. */
-export const PERMANENCIA_MS = 2 * 60 * 1000;
-/** Depois das boas-vindas, a mesma loja só cumprimenta de novo depois disso (mesma validade do modo loja). */
-const INTERVALO_MS = 4 * 60 * 60 * 1000;
 
-const TAREFA = 'boas-vindas-na-loja';
 const CHAVE_COORDENADAS = 'lojas-coordenadas:v1';
-const CHAVE_SAUDADAS = 'boas-vindas:v1';
-const CHAVE_LOJAS = 'boas-vindas-lojas:v1';
-
-export type Ponto = { latitude: number; longitude: number };
-export type LojaNoMapa = { slug: string; nome: string } & Ponto;
-
-/** No Expo Go (e na prévia do navegador) o celular não deixa o app ouvir a localização com ele fechado. */
-export const temSegundoPlano = Platform.OS !== 'web' && Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
 
 /** Distância em metros entre dois pontos (fórmula de haversine). */
 export function distancia(a: Ponto, b: Ponto) {
@@ -69,54 +59,6 @@ export async function lojasNoMapa(lojas: LojaFisica[]): Promise<LojaNoMapa[]> {
   }
   await gravar(CHAVE_COORDENADAS, guardadas);
   return resultado;
-}
-
-/** Loja que já recebeu boas-vindas há pouco não cumprimenta de novo. */
-export async function jaSaudou(slug: string) {
-  const saudadas = await ler<Record<string, number>>(CHAVE_SAUDADAS, {});
-  return Date.now() - (saudadas[slug] ?? 0) < INTERVALO_MS;
-}
-
-export async function marcarSaudada(slug: string, quando: number | null = Date.now()) {
-  const saudadas = await ler<Record<string, number>>(CHAVE_SAUDADAS, {});
-  if (quando === null) delete saudadas[slug];
-  else saudadas[slug] = quando;
-  await gravar(CHAVE_SAUDADAS, saudadas);
-}
-
-const idAviso = (slug: string) => `boas-vindas-${slug}`;
-
-// Aviso do celular com o app fechado. Fica no nível do arquivo porque o celular acorda o app só para rodar a tarefa.
-if (temSegundoPlano) {
-  TaskManager.defineTask<{ eventType: Location.GeofencingEventType; region: Location.LocationRegion }>(
-    TAREFA,
-    async ({ data, error }) => {
-      if (error || !data?.region.identifier) return;
-      const slug = data.region.identifier;
-      if (data.eventType === Location.GeofencingEventType.Enter) {
-        if (await jaSaudou(slug)) return;
-        const lojas = await ler<LojaNoMapa[]>(CHAVE_LOJAS, []);
-        const nome = lojas.find((l) => l.slug === slug)?.nome ?? '';
-        await Notifications.scheduleNotificationAsync({
-          identifier: idAviso(slug),
-          content: {
-            title: `Bem-vindo à Casa Contente ${nome}!`,
-            body: 'Toque para ver os produtos desta loja e comprar pelo celular.',
-            data: { loja: slug },
-          },
-          trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: PERMANENCIA_MS / 1000 },
-        });
-        // Conta como saudada já agora; se a pessoa sair antes dos 2 minutos, desfaz.
-        await marcarSaudada(slug, Date.now() + PERMANENCIA_MS);
-      } else if (data.eventType === Location.GeofencingEventType.Exit) {
-        const agendado = await ler<Record<string, number>>(CHAVE_SAUDADAS, {});
-        if ((agendado[slug] ?? 0) > Date.now()) {
-          await Notifications.cancelScheduledNotificationAsync(idAviso(slug));
-          await marcarSaudada(slug, null);
-        }
-      }
-    },
-  );
 }
 
 /** Liga o aviso com o app fechado. Precisa da permissão de localização "sempre" e da de avisos. */

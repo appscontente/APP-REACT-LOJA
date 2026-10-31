@@ -70,16 +70,31 @@ function passaLuhn(digitos: string) {
 }
 
 /**
- * true se o texto tem um número de cartão: 13 a 19 dígitos (com espaço, ponto ou traço entre eles) que passam no teste
- * de Luhn. Confere a sequência inteira e cada começo dela formado por grupos inteiros, para pegar também
- * "5502 0912 3456 7890 123" (cartão seguido do CVV). O cartão nunca pode ficar gravado na conversa (PCI).
+ * true se o texto tem um número de cartão: 13 a 19 dígitos (com espaço, ponto, traço ou barra entre eles, até 3 seguidos,
+ * ou em linhas de 4 dígitos) que passam no teste de Luhn. Confere cada trecho de grupos vizinhos, para pegar o cartão também depois
+ * de um CPF ou telefone na linha de cima e antes da validade e do CVV. Grupo com menos de 4 dígitos só entra sozinho ou
+ * no fim do trecho (cartão de 19 dígitos em 4-4-4-4-3): assim CPF, CEP e telefone não se juntam num falso cartão.
+ * 13 dígitos só vale começando com 4 (Visa antigo): celular com +55 tem 13 dígitos e passaria no Luhn 1 vez em 10.
+ * O cartão nunca pode ficar gravado na conversa (PCI).
  */
 export function pareceCartao(texto: string) {
-  for (const [sequencia] of texto.matchAll(/\d(?:[ .-]?\d)*/g)) {
-    const grupos = sequencia.split(/[ .-]/);
-    const candidatos = [grupos.join('')];
-    for (let i = 1; i < grupos.length; i++) candidatos.push(grupos.slice(0, i).join(''));
-    if (candidatos.some((c) => c.length >= 13 && c.length <= 19 && /^[2-6]/.test(c) && passaLuhn(c))) return true;
+  const tamanhoOk = (c: string) => (c.length >= 14 || (c.length === 13 && c[0] === '4')) && c.length <= 19;
+  // A quebra de linha só junta grupos de 4 dígitos (cartão digitado em linhas). Entre outros números (pedido, nota, CPF
+  // numa linha e telefone na outra) ela separa, com um "|" que a busca abaixo não atravessa.
+  const linhas = texto.split(/\r?\n/);
+  let junto = linhas[0];
+  for (let k = 1; k < linhas.length; k++)
+    junto += (/(?:^|\D)\d{4}\s*$/.test(junto) && /^\s*\d{4}(?:\D|$)/.test(linhas[k]) ? ' ' : ' | ') + linhas[k];
+  for (const [sequencia] of junto.matchAll(/\d(?:[\s.\-\/]{0,3}\d)*/g)) {
+    const grupos = sequencia.split(/[\s.\-\/]+/);
+    for (let i = 0; i < grupos.length; i++) {
+      let candidato = '';
+      for (let j = i; j < grupos.length && candidato.length <= 19; j++) {
+        if (j > i && grupos[j - 1].length < 4) break;
+        candidato += grupos[j];
+        if (tamanhoOk(candidato) && /^[2-6]/.test(candidato) && passaLuhn(candidato)) return true;
+      }
+    }
   }
   return false;
 }

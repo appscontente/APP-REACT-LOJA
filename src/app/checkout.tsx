@@ -6,7 +6,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as ScreenCapture from 'expo-screen-capture';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppState, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Botao } from '@/componentes/botao';
@@ -18,7 +18,7 @@ import { disponiveis, totais, useCarrinho } from '@/estado/carrinho';
 import { useConta } from '@/estado/conta';
 import { useFigital } from '@/estado/figital';
 import { useRegraPagamento } from '@/estado/pagamento';
-import { consultarRetirada, cotarFrete, type CotacaoFrete, type ResultadoRetirada } from '@/lib/api';
+import { consultarRetirada, cotarFrete, type CotacaoFrete, type EnderecoCep, type ResultadoRetirada } from '@/lib/api';
 import {
   arredondar,
   calcularParcelas,
@@ -107,7 +107,7 @@ export default function Checkout() {
   // Vindo do carrinho da loja (Figital), o checkout usa o carrinho dela e o cliente pode voltar ao caixa.
   const { loja: daLoja } = useLocalSearchParams<{ loja?: string }>();
   const destino = daLoja ?? 'site';
-  const { itens, esvaziar, atualizar } = useCarrinho();
+  const { itens, esvaziar, remover, atualizar } = useCarrinho();
   const conta = useConta();
   const { lojas, lojaAtual } = useFigital();
   const regra = useRegraPagamento();
@@ -173,8 +173,12 @@ export default function Checkout() {
   const [enviando, setEnviando] = useState(false);
   /** Recusa do cartão, preço que mudou, sem estoque: com o backend, a mensagem do servidor aparece aqui. */
   const [erroPagamento, setErroPagamento] = useState<string>();
+  /** Pedido feito: a tela some na troca para o pedido recebido. */
+  const [concluido, setConcluido] = useState(false);
   /** Fora de primeiro plano (seletor de apps), os dados do cartão ficam cobertos para não aparecerem na miniatura. */
   const [emPrimeiroPlano, setEmPrimeiroPlano] = useState(AppState.currentState === 'active');
+  /** Último endereço que veio do CEP (e de qual CEP): ao trocar o CEP, troca o que ele preencheu e mantém o que o cliente digitou. */
+  const doCep = useRef<(EnderecoCep & { cep: string }) | undefined>(undefined);
 
   useEffect(() => {
     const assinatura = AppState.addEventListener('change', (estado) => setEmPrimeiroPlano(estado === 'active'));
@@ -187,19 +191,31 @@ export default function Checkout() {
     if (!chaveFrete) return;
     let ativo = true;
     const espera = setTimeout(() => ativo && setCotado((c) => (c?.chave === chaveFrete ? c : { chave: chaveFrete })), ESPERA_FRETE_MS);
+    // Troca o campo vazio ou ainda igual ao que o CEP anterior preencheu; o que o cliente digitou fica. CEP sem rua (CEP
+    // geral de cidade) limpa a rua que veio do CEP antigo, e CEP novo sem endereço (o site não achou ou a cotação falhou)
+    // limpa tudo o que veio do antigo. O mesmo CEP cotado de novo sem endereço (outra quantidade, "Tentar de novo") não
+    // apaga nada.
+    const preencher = (e?: EnderecoCep) => {
+      const antes = doCep.current;
+      if (!e && (!antes || antes.cep === cep)) return;
+      const novo: EnderecoCep = e ?? { logradouro: '', bairro: '', cidade: '', uf: '' };
+      setLogradouro((a) => (!a || a === antes?.logradouro ? (novo.logradouro ?? '') : a));
+      setBairro((a) => (!a || a === antes?.bairro ? (novo.bairro ?? '') : a));
+      setCidade((a) => (!a || a === antes?.cidade ? (novo.cidade ?? '') : a));
+      setUf((a) => (!a || a === antes?.uf?.toUpperCase() ? (novo.uf ?? '').toUpperCase() : a));
+      doCep.current = e ? { ...e, cep } : undefined;
+    };
     cotarFrete(cep, subtotal)
       .then((frete) => {
         if (!ativo) return;
         setCotado({ chave: chaveFrete, frete });
-        const e = frete.endereco;
-        if (!e) return;
-        // Só preenche o que o cliente ainda não digitou. CEP geral de cidade vem sem rua e sem bairro.
-        if (e.logradouro) setLogradouro((atual) => atual || e.logradouro || '');
-        if (e.bairro) setBairro((atual) => atual || e.bairro);
-        if (e.cidade) setCidade((atual) => atual || e.cidade);
-        if (e.uf) setUf((atual) => atual || e.uf.toUpperCase());
+        preencher(frete.endereco);
       })
-      .catch(() => ativo && setCotado({ chave: chaveFrete }))
+      .catch(() => {
+        if (!ativo) return;
+        setCotado({ chave: chaveFrete });
+        preencher(undefined);
+      })
       .finally(() => clearTimeout(espera));
     return () => {
       ativo = false;
@@ -234,6 +250,22 @@ export default function Checkout() {
   const retiradaCarregando = Boolean(chaveRetirada) && retirada?.chave !== chaveRetirada;
   const lojaEscolhida = opcoesRetirada?.find((o) => o.loja === loja);
 
+  // Pedido feito: a tela do pedido recebido está entrando por cima; nada de "carrinho vazio" piscando na troca.
+  if (concluido) return null;
+  // Tudo ficou de fora (indisponível ou, vindo da loja, só no caixa): não é carrinho vazio, o cliente volta para conferir.
+  if (!lista.length && todos.length)
+    return (
+      <Aviso
+        titulo="Nenhum produto pode ser pago aqui agora"
+        texto={
+          daLoja && !todos.some((i) => i.indisponivel)
+            ? 'Estes produtos só podem ser pagos no caixa da loja. Volte ao carrinho da loja para gerar o comprovante.'
+            : 'Há produtos indisponíveis no carrinho. Volte ao carrinho para conferir.'
+        }
+        acao="Voltar ao carrinho"
+        aoTocar={() => (daLoja ? router.dismissTo(rotaCarrinhoLoja(daLoja) as never) : router.dismissTo('/carrinho'))}
+      />
+    );
   if (!lista.length) return <Aviso titulo="Seu carrinho está vazio" acao="Voltar ao início" aoTocar={() => router.dismissTo('/')} />;
 
   const valorFrete = entrega === 'retirada' ? 0 : frete?.atendido ? frete.cotacao.valor : undefined;
@@ -265,6 +297,8 @@ export default function Checkout() {
     !celularValido(celular) && 'celular com DDD',
     entrega === 'retirada' && (!loja || lojaEscolhida?.disponivel === false) && 'loja de retirada',
     entrega === 'retirada' && lojaEscolhida?.exposicao && !aceitaExposicao && 'aceite da peça de exposição',
+    // Enquanto a retirada recalcula, a loja escolhida some das opções e o aceite acima não aparece: o botão espera.
+    entrega === 'retirada' && retiradaCarregando && 'aguardar o prazo da retirada',
     cep.length !== 8 && 'CEP',
     entrega === 'entrega' &&
       cep.length === 8 &&
@@ -317,7 +351,10 @@ export default function Checkout() {
         pix: temPix ? { valor: divisao ? divisao.pix : total } : undefined,
       });
       if (!conta.logado) conta.entrar(email.trim().toLowerCase(), nome.trim());
-      esvaziar(destino);
+      setConcluido(true);
+      // Sai do carrinho só o que foi pago aqui: o que ficou de fora continua lá (indisponível ou para o caixa da loja).
+      if (deFora > 0) lista.forEach((i) => remover(i.codprod, destino));
+      else esvaziar(destino);
       router.replace({ pathname: '/pedido-recebido', params: { numero: numeroPedido } });
     } catch (e) {
       setErroPagamento(e instanceof Error && e.message ? e.message : 'Não conseguimos concluir o pedido. Confira os dados e tente de novo.');

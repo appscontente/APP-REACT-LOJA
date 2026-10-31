@@ -11,6 +11,9 @@
     "ios": {
       "bundleIdentifier": "br.com.casacontente.app",
       "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "associatedDomains": [
         "applinks:casacontente.com.br",
         "applinks:www.casacontente.com.br",
@@ -29,6 +32,11 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
       "intentFilters": [
         {
           "action": "VIEW",
@@ -64,7 +72,8 @@
         "expo-camera",
         {
           "cameraPermission": "A câmera lê o QR code das etiquetas e o código de barras dos produtos na loja.",
-          "recordAudioAndroid": false
+          "recordAudioAndroid": false,
+          "microphonePermission": false
         }
       ],
       [
@@ -72,6 +81,9 @@
         {
           "locationWhenInUsePermission": "A localização serve para o app dar boas-vindas quando você chega numa loja Casa Contente. Ela fica só no celular.",
           "locationAlwaysAndWhenInUsePermission": "Com o app fechado, a localização serve para avisar quando você passar 2 minutos numa loja Casa Contente. Ela fica só no celular e você desliga na Conta.",
+          "locationAlwaysPermission": "Com o app fechado, a localização serve para avisar quando você passar 2 minutos numa loja Casa Contente. Ela fica só no celular e você desliga na Conta.",
+          "locationFullAccuracyPermission": "A localização exata serve para saber se você está dentro de uma loja Casa Contente. Ela fica só no celular.",
+          "motionUsagePermission": false,
           "isIosBackgroundLocationEnabled": false,
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": false
@@ -83,7 +95,12 @@
           "color": "#d71921"
         }
       ],
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
       [
         "expo-splash-screen",
         {

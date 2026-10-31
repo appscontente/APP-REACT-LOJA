@@ -85,8 +85,9 @@ export default function ProdutoNaLoja() {
   const pixCaixa = tabela?.descontos.pix?.caixa ?? 0;
   const melhor = tabela ? Math.max(0, ...Object.values(tabela.descontos).map((d) => d.caixa)) : 0;
   const item = { ...p, imagem: p.imagens[0]?.src, estoque: origem.disponivel, origemEstoque: origem.origem, entregavel: dados.entregavel };
-  // Já no carrinho: a escolha (mostruário ou outro lugar) foi feita na primeira vez.
-  const jaNoCarrinho = itens(loja.slug).some((i) => i.codprod === p.codprod);
+  // Já no carrinho: a escolha (mostruário ou outro lugar) foi feita na primeira vez. Item que ficou indisponível não
+  // conta: a saída escolhida acabou e o cliente escolhe de novo.
+  const jaNoCarrinho = itens(loja.slug).some((i) => i.codprod === p.codprod && !i.indisponivel);
 
   const conversar = () => {
     const id = iniciar({ loja: loja.slug, nomeLoja: loja.nome, assunto: nome, produto: item });

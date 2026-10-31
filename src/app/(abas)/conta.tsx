@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Botao } from '@/componentes/botao';
@@ -13,6 +13,7 @@ import { Texto } from '@/componentes/texto';
 import { useBoasVindas } from '@/estado/boas-vindas';
 import { useConta, useSairDaConta } from '@/estado/conta';
 import { useConversas } from '@/estado/conversas';
+import { temSegundoPlano } from '@/lib/perto-da-loja';
 import { cores, fontes, raio } from '@/lib/tema';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -99,6 +100,27 @@ function Opcao({ icone, titulo, texto, aoTocar, contador }: { icone: React.Compo
   );
 }
 
+/** Leva aos ajustes do app no celular, onde o cliente muda a permissão de localização. */
+function avisarAjustes(titulo: string, texto: string) {
+  Alert.alert(titulo, texto, [
+    { text: 'Agora não', style: 'cancel' },
+    { text: 'Abrir ajustes', onPress: () => Linking.openSettings().catch(() => undefined) },
+  ]);
+}
+
+/**
+ * O que escolher na tela de permissão do celular. Sem a localização exata as boas-vindas não funcionam; no Android, o
+ * "o tempo todo" só aparece no app instalado (no Expo Go não há aviso com o app fechado).
+ */
+const ESCOLHA_PERMISSAO =
+  Platform.OS === 'android'
+    ? temSegundoPlano
+      ? ' Na próxima tela, deixe a localização “Precisa” e, quando o celular pedir, escolha “Permitir o tempo todo”.'
+      : ' Na próxima tela, deixe a localização “Precisa”.'
+    : Platform.OS === 'ios'
+      ? ' Na próxima tela, deixe a “Localização Exata” ligada.'
+      : '';
+
 /** Liga as boas-vindas na loja. Explica antes de o celular pedir a permissão de localização. */
 function OpcaoBoasVindas() {
   const { ligado, ligar, desligar } = useBoasVindas();
@@ -106,13 +128,17 @@ function OpcaoBoasVindas() {
     if (!quer) return desligar();
     Alert.alert(
       'Boas-vindas na loja',
-      'Quando você passar 2 minutos numa loja Casa Contente, o app dá as boas-vindas e já entra no modo daquela loja. Para isso ele usa a localização do celular, inclusive com o app fechado ou sem uso. Ela fica só no celular e não vai para a loja. Você pode desligar aqui quando quiser.',
+      'Quando você passar 2 minutos numa loja Casa Contente, o app dá as boas-vindas e já entra no modo daquela loja. Para isso ele usa a localização do celular, inclusive com o app fechado ou sem uso.' +
+        ESCOLHA_PERMISSAO +
+        ' O celular guarda só em qual loja e quando você recebeu as boas-vindas; sua localização não sai do celular. Você pode desligar aqui quando quiser.',
       [
         { text: 'Agora não', style: 'cancel' },
         {
           text: 'Ligar',
           onPress: async () => {
-            if (!(await ligar())) Alert.alert('Sem localização', 'Para ligar, permita a localização do app nos ajustes do celular.');
+            const resultado = await ligar();
+            if (resultado === 'sem-permissao') avisarAjustes('Sem localização', 'Para ligar, permita a localização do app nos ajustes do celular.');
+            else if (resultado === 'aproximada') avisarAjustes('Localização aproximada', 'Para as boas-vindas, ative a localização exata nos ajustes do celular.');
           },
         },
       ],

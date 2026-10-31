@@ -18,12 +18,15 @@ export function Aviso({
   texto,
   acao,
   aoTocar,
+  secundaria,
   triste,
 }: {
   titulo: string;
   texto?: string;
   acao?: string;
   aoTocar?: () => void;
+  /** Segundo botão, de contorno, logo abaixo do principal (ex.: "Ir para o início" na tela de erro). */
+  secundaria?: { titulo: string; aoTocar: () => void };
   triste?: boolean;
 }) {
   return (
@@ -38,6 +41,7 @@ export function Aviso({
         </Texto>
       ) : null}
       {acao && aoTocar ? <Botao titulo={acao} onPress={aoTocar} style={{ marginTop: 8 }} /> : null}
+      {secundaria ? <Botao titulo={secundaria.titulo} variante="contorno" onPress={secundaria.aoTocar} /> : null}
     </View>
   );
 }

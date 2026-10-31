@@ -17,6 +17,7 @@ import {
   RAIO_M,
   desligarSegundoPlano,
   distancia,
+  idAviso,
   jaSaudou,
   ligarSegundoPlano,
   limparBoasVindas,
@@ -41,15 +42,26 @@ Notifications.setNotificationHandler({
   handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: false, shouldSetBadge: false }),
 });
 
+/** Resultado de ligar: 'aproximada' quando o celular só deu a localização aproximada, que não serve para as boas-vindas. */
+export type ResultadoLigar = 'ligado' | 'sem-permissao' | 'aproximada';
+
 type Contexto = {
   ligado: boolean;
   /** true quando o aviso com o app fechado também está ligado (no Expo Go, só com o app aberto). */
   comAppFechado: boolean;
-  ligar: () => Promise<boolean>;
+  ligar: () => Promise<ResultadoLigar>;
   desligar: () => void;
 };
 
 const ContextoBoasVindas = createContext<Contexto | null>(null);
+
+/**
+ * Localização aproximada (Android "aproximada", iPhone sem "Localização exata") erra por centenas de metros, mais que o
+ * raio da loja: com ela as boas-vindas ficariam ligadas sem nunca aparecer.
+ */
+function soAproximada(p: Location.LocationPermissionResponse) {
+  return p.android?.accuracy === 'coarse' || p.ios?.accuracy === 'reduced';
+}
 
 /**
  * Android 11+: o pedido de "o tempo todo" abre direto os Ajustes do celular. Antes disso, o app explica o que o cliente
@@ -81,9 +93,10 @@ export function ProvedorBoasVindas({ children }: { children: ReactNode }) {
   useEffect(() => {
     (async () => {
       if (!(await ler<boolean>(CHAVE, false))) return;
-      // A permissão pode ter sido tirada nos Ajustes com o app fechado: aí a chave da Conta volta a ficar desligada.
+      // A permissão pode ter sido tirada nos Ajustes com o app fechado, ou trocada para aproximada (com ela a cerca da
+      // loja não funciona): aí a chave da Conta volta a ficar desligada.
       const permissao = await Location.getForegroundPermissionsAsync().catch(() => undefined);
-      if (permissao && !permissao.granted) {
+      if (permissao && (!permissao.granted || soAproximada(permissao))) {
         gravar(CHAVE, false);
         desligarSegundoPlano();
         return;
@@ -139,7 +152,7 @@ export function ProvedorBoasVindas({ children }: { children: ReactNode }) {
           if (!chegou) chegadas.current.set(loja.slug, Date.now());
           else if (Date.now() - chegou >= PERMANENCIA_MS && !(await jaSaudou(loja.slug)) && ativo) {
             await marcarSaudada(loja.slug);
-            await Notifications.cancelScheduledNotificationAsync(`boas-vindas-${loja.slug}`).catch(() => undefined);
+            await Notifications.cancelScheduledNotificationAsync(idAviso(loja.slug)).catch(() => undefined);
             saudar(loja, false);
           }
         } else if (d > RAIO_M * 1.5) {
@@ -151,7 +164,7 @@ export function ProvedorBoasVindas({ children }: { children: ReactNode }) {
 
     (async () => {
       const permissao = await Location.getForegroundPermissionsAsync();
-      if (!permissao.granted || !ativo) return;
+      if (!permissao.granted || soAproximada(permissao) || !ativo) return;
       mapa = await lojasNoMapa(lojas);
       if (!ativo) return;
       assinatura = await Location.watchPositionAsync(
@@ -176,18 +189,19 @@ export function ProvedorBoasVindas({ children }: { children: ReactNode }) {
       comAppFechado,
       ligar: async () => {
         const permissao = await Location.requestForegroundPermissionsAsync();
-        if (!permissao.granted) return false;
+        if (!permissao.granted) return 'sem-permissao';
+        if (soAproximada(permissao)) return 'aproximada';
         setLigado(true);
         gravar(CHAVE, true);
         if (temSegundoPlano) {
           if (Platform.OS === 'android') {
             const sempre = await Location.getBackgroundPermissionsAsync().catch(() => undefined);
-            if (!sempre?.granted && !(await explicarAjustesAndroid())) return true;
+            if (!sempre?.granted && !(await explicarAjustesAndroid())) return 'ligado';
           }
           const mapa = await lojasNoMapa(lojas);
           setComAppFechado(await ligarSegundoPlano(mapa).catch(() => false));
         }
-        return true;
+        return 'ligado';
       },
       desligar: () => {
         setLigado(false);

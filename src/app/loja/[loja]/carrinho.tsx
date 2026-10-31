@@ -5,9 +5,9 @@
 // POST /figital/pedidos. O comprovante fica guardado no celular (estado/figital.tsx) até a reserva vencer.
 
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { AccessibilityInfo, Alert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
 import { Botao } from '@/componentes/botao';
@@ -17,7 +17,7 @@ import { Aviso, Carregando, Erro } from '@/componentes/estado-tela';
 import { ItemCarrinho } from '@/componentes/item-carrinho';
 import { Resumo } from '@/componentes/resumo';
 import { Texto } from '@/componentes/texto';
-import { totais, useCarrinho } from '@/estado/carrinho';
+import { disponiveis, textoMudanca, totais, useCarrinho, type MudancaCarrinho } from '@/estado/carrinho';
 import { useLojas, type ComprovanteLoja } from '@/estado/figital';
 import { api } from '@/lib/api';
 import { arredondar, cpfValido, formatarHora, formatarPreco, nomeLegivel } from '@/lib/formatar';
@@ -54,7 +54,7 @@ function confirmarDescarte(descartar: () => void) {
 export default function CarrinhoLoja() {
   const { loja: slug, comprovante: abrirComprovante } = useLocalSearchParams<{ loja: string; comprovante?: string }>();
   const { lojas, erroLojas, tentarLojas, comprovante, guardarComprovante, descartarComprovante } = useLojas();
-  const { itens, esvaziar } = useCarrinho();
+  const { itens, esvaziar, atualizar } = useCarrinho();
   const [nome, setNome] = useState('');
   const [cpf, setCpf] = useState('');
   const [enviando, setEnviando] = useState(false);
@@ -67,11 +67,35 @@ export default function CarrinhoLoja() {
     () => (slug && codprods.length ? api.descontos(slug, codprods) : Promise.resolve({ itens: [] })),
     [slug, codprods.join(',')],
   );
+  // Ao abrir, confere o carrinho guardado com o site, como o carrinho do site: preço, desconto e se a saída escolhida
+  // ainda tem peça. Só com a loja carregada (o carrinho é guardado pelo slug dela).
+  const slugLoja = lojas.some((l) => l.slug === slug) ? slug : undefined;
+  const [conferencia, setConferencia] = useState<{ mudancas: MudancaCarrinho[]; falhou?: boolean }>();
+  useFocusEffect(
+    useCallback(() => {
+      if (!slugLoja) return;
+      let ativo = true;
+      atualizar(slugLoja).then(
+        (mudancas) => {
+          if (!ativo) return;
+          setConferencia({ mudancas });
+          if (mudancas.length) AccessibilityInfo.announceForAccessibility(`Seu carrinho mudou. ${mudancas.map(textoMudanca).join(' ')}`);
+        },
+        () => ativo && setConferencia({ mudancas: [], falhou: true }),
+      );
+      return () => {
+        ativo = false;
+      };
+    }, [atualizar, slugLoja]),
+  );
   if (!lojas.length) return erroLojas ? <Erro mensagem="Não conseguimos carregar as lojas." tentar={tentarLojas} /> : <Carregando />;
   if (!loja) return <Aviso titulo="Loja não encontrada" acao="Voltar ao início" aoTocar={() => router.dismissTo('/')} triste />;
   const tabela = descontos?.itens ?? [];
+  // Os indisponíveis ficam fora da conta, do comprovante e do pagamento; com algum no carrinho, nada é gerado.
+  const validos = disponiveis(lista);
+  const temIndisponivel = lista.some((i) => i.indisponivel);
   const { subtotal, pix: pixPeloApp } = totais(lista);
-  const desconto = arredondar(descontoEm(lista, tabela, pagamento));
+  const desconto = arredondar(descontoEm(validos, tabela, pagamento));
   const total = arredondar(subtotal - desconto);
   const aberto = comprovante(loja.slug);
 
@@ -107,10 +131,11 @@ export default function CarrinhoLoja() {
   const cpfOk = cpfValido(digitosCpf);
   const pronto = nome.trim().length > 2 && cpfOk;
   // Só o caixa finaliza produto sem medidas de embalagem (contrato 4.2): ele não entra no "Pagar pelo app".
-  const todosEntregaveis = lista.every((i) => i.entregavel !== false);
+  const todosEntregaveis = validos.every((i) => i.entregavel !== false);
 
   const gerarComprovante = () => {
-    if (enviando) return;
+    // Um comprovante por loja: o segundo apagaria o primeiro (e a reserva dele) do celular.
+    if (enviando || aberto) return;
     setEnviando(true);
     try {
       // Demonstração: número e validade feitos no celular. Com o backend, vêm da resposta do pedido da loja.
@@ -120,7 +145,7 @@ export default function CarrinhoLoja() {
         total,
         desconto,
         pagamento,
-        itens: lista.map((i) => ({ nome: i.nome, quantidade: i.quantidade })),
+        itens: validos.map((i) => ({ nome: i.nome, quantidade: i.quantidade })),
       });
       esvaziar(loja.slug);
     } finally {
@@ -144,6 +169,24 @@ export default function CarrinhoLoja() {
             Ver
           </Texto>
         </Pressable>
+      ) : null}
+      {conferencia?.mudancas.length || conferencia?.falhou ? (
+        <View style={estilos.aviso}>
+          <Ionicons name="information-circle" size={20} color={cores.aviso} />
+          <View style={{ flex: 1, gap: 4 }}>
+            {conferencia.falhou ? (
+              <Texto variante="pequeno" cor={cores.aviso}>
+                Não conseguimos conferir preço e disponibilidade agora. Confira a internet.
+              </Texto>
+            ) : (
+              conferencia.mudancas.map((m) => (
+                <Texto key={`${m.tipo}${m.codprod}`} variante="pequeno" cor={cores.aviso}>
+                  {textoMudanca(m)}
+                </Texto>
+              ))
+            )}
+          </View>
+        </View>
       ) : null}
       {lista.map((i) => (
         <ItemCarrinho key={i.codprod} item={i} destino={loja.slug} />
@@ -171,7 +214,7 @@ export default function CarrinhoLoja() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
           {PAGAMENTOS_FIGITAL.map((pg) => {
             const ativo = pg === pagamento;
-            const valor = descontoEm(lista, tabela, pg);
+            const valor = descontoEm(validos, tabela, pg);
             return (
               <Pressable
                 key={pg}
@@ -206,9 +249,15 @@ export default function CarrinhoLoja() {
             CPF inválido.
           </Texto>
         ) : null}
+        {temIndisponivel ? <AvisoIndisponivel /> : null}
+        {aberto ? (
+          <Texto variante="pequeno" cor={cores.marca}>
+            Pague ou descarte o comprovante Nº {aberto.numero} antes de gerar outro.
+          </Texto>
+        ) : null}
         <Botao
           titulo={`Gerar comprovante para pagar em ${NOME_PAGAMENTO(pagamento)}`}
-          disabled={!pronto}
+          disabled={!pronto || Boolean(aberto) || temIndisponivel}
           carregando={enviando}
           onPress={gerarComprovante}
         />
@@ -226,16 +275,26 @@ export default function CarrinhoLoja() {
             Indisponível: há produto no carrinho que só pode ser finalizado no caixa.
           </Texto>
         )}
+        {temIndisponivel ? <AvisoIndisponivel /> : null}
         <Botao
           titulo="Pagar pelo app"
           variante="contorno"
-          disabled={!todosEntregaveis}
+          disabled={!todosEntregaveis || temIndisponivel}
           // Os itens continuam no carrinho da loja: se o cliente voltar, ainda pode pagar no caixa.
           onPress={() => router.push({ pathname: '/checkout', params: { loja: loja.slug } })}
         />
       </View>
       <BotaoSairDaLoja />
     </ScrollView>
+  );
+}
+
+/** O mesmo aviso do carrinho do site, perto de cada botão que fica desligado. */
+function AvisoIndisponivel() {
+  return (
+    <Texto variante="pequeno" cor={cores.marca}>
+      Tire do carrinho os itens indisponíveis para continuar.
+    </Texto>
   );
 }
 
@@ -276,5 +335,6 @@ const estilos = StyleSheet.create({
   opcao: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: raio.m, borderWidth: 1, borderColor: cores.borda, gap: 2 },
   opcaoAtiva: { borderColor: cores.marca, borderWidth: 2 },
   faixa: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: raio.m, backgroundColor: cores.creme },
+  aviso: { flexDirection: 'row', gap: 8, padding: 12, borderRadius: raio.m, backgroundColor: cores.avisoFundo },
   combinado: { gap: 2, padding: 10, borderRadius: raio.m, backgroundColor: cores.sucessoFundo, alignSelf: 'stretch' },
 });

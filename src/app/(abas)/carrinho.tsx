@@ -9,18 +9,11 @@ import { Aviso } from '@/componentes/estado-tela';
 import { ItemCarrinho } from '@/componentes/item-carrinho';
 import { Resumo } from '@/componentes/resumo';
 import { Texto } from '@/componentes/texto';
-import { totais, useCarrinho, type MudancaCarrinho } from '@/estado/carrinho';
+import { textoMudanca, totais, useCarrinho, type MudancaCarrinho } from '@/estado/carrinho';
 import { useFigital } from '@/estado/figital';
-import { formatarPreco, nomeLegivel } from '@/lib/formatar';
+import { formatarPreco } from '@/lib/formatar';
 import { rotaCarrinhoLoja } from '@/lib/rotas';
 import { cores, raio } from '@/lib/tema';
-
-const textoMudanca = (m: MudancaCarrinho) => {
-  const nome = nomeLegivel(m.nome);
-  if (m.tipo === 'preco') return `O preço de ${nome} mudou de ${formatarPreco(m.de)} para ${formatarPreco(m.para)}.`;
-  if (m.tipo === 'quantidade') return `Ajustamos a quantidade de ${nome} ao que temos disponível.`;
-  return `${nome} ficou indisponível.`;
-};
 
 /** Carrinho do site. O carrinho de cada loja (Figital) é outro e aparece aqui só como atalho. */
 export default function Carrinho() {

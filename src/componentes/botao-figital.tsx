@@ -12,7 +12,7 @@ import { useFigital, useLojas } from '@/estado/figital';
 import { rotaLoja } from '@/lib/rotas';
 import { cores, fontes, raio } from '@/lib/tema';
 import { useReduzirMovimento } from '@/lib/use-reduzir-movimento';
-import { ALTURA_BARRA_COMPRA } from './barra-compra';
+import { ALTURA_BARRA_COMPRA, useAvisoCarrinhoAberto } from './barra-compra';
 import { Botao } from './botao';
 import { Texto } from './texto';
 
@@ -65,6 +65,8 @@ export function BotaoFigital() {
   const baixo = useSafeAreaInsets().bottom;
   const { lojaAtual } = useFigital();
   const [escolhendo, setEscolhendo] = useState(false);
+  // O aviso "Adicionado ao carrinho" fica em cima da barra de compra: o botão sairia por cima do "Ver carrinho".
+  const avisoAberto = useAvisoCarrinhoAberto();
   if (ESCONDER.some((r) => r.test(caminho))) return null;
   const naLoja = lojaAtual && caminho.startsWith(rotaLoja(lojaAtual.slug));
   if (naLoja) return null;
@@ -73,20 +75,23 @@ export function BotaoFigital() {
   const alturaAbas = COM_ABAS.includes(caminho) ? 66 : noProduto ? ALTURA_BARRA_COMPRA : 0;
   return (
     <>
-      <Pressable
-        onPress={() => (lojaAtual ? router.push(rotaLoja(lojaAtual.slug) as never) : setEscolhendo(true))}
-        accessibilityRole="button"
-        accessibilityLabel={lojaAtual ? `Abrir o autoatendimento da loja ${lojaAtual.nome}` : 'Estou na loja: autoatendimento'}
-        style={({ pressed }) => [
-          estilos.botao,
-          noProduto && estilos.compacto,
-          { bottom: baixo + alturaAbas + 16 },
-          pressed && { transform: [{ scale: 0.96 }] },
-        ]}>
-        <Ionicons name="storefront" size={22} color={cores.texto} />
-        {/* No produto o botão fica só com o ícone, para não cobrir o frete e o preço. */}
-        {!noProduto && <RotuloAlternado rotulos={[lojaAtual ? lojaAtual.nome : 'Na loja', 'Autoatendimento']} />}
-      </Pressable>
+      {!avisoAberto && (
+        <Pressable
+          onPress={() => (lojaAtual ? router.push(rotaLoja(lojaAtual.slug) as never) : setEscolhendo(true))}
+          accessibilityRole="button"
+          accessibilityLabel={lojaAtual ? `Abrir o autoatendimento da loja ${lojaAtual.nome}` : 'Estou na loja: autoatendimento'}
+          style={({ pressed }) => [
+            estilos.botao,
+            noProduto && estilos.compacto,
+            { bottom: baixo + alturaAbas + 16 },
+            pressed && { transform: [{ scale: 0.96 }] },
+          ]}>
+          <Ionicons name="storefront" size={22} color={cores.texto} />
+          {/* No produto o botão fica só com o ícone, para não cobrir o frete e o preço. */}
+          {!noProduto && <RotuloAlternado rotulos={[lojaAtual ? lojaAtual.nome : 'Na loja', 'Autoatendimento']} />}
+        </Pressable>
+      )}
+      {/* A gaveta fica montada mesmo com o botão escondido, para não perder o estado dela. */}
       <GavetaLojas aberta={escolhendo} fechar={() => setEscolhendo(false)} />
     </>
   );

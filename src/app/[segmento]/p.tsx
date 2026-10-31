@@ -31,6 +31,17 @@ import { useDados } from '@/lib/use-dados';
 /** Respostas do site que a página do site resolve melhor (conjunto, produto encerrado ou endereço que não existe mais). */
 const ABRIR_NO_SITE = ['conjunto', 'nao_encontrado', 'encerrado'];
 
+/** Caminho sem domínio do site, query, hash e barra final, decodificado (o parâmetro da rota já chega decodificado). */
+function caminhoDe(endereco: string) {
+  const semDominio = endereco.startsWith(SITE_URL) ? endereco.slice(SITE_URL.length) : endereco;
+  const caminho = semDominio.split(/[?#]/)[0].replace(/\/+$/, '');
+  try {
+    return decodeURIComponent(caminho);
+  } catch {
+    return caminho;
+  }
+}
+
 export default function PaginaProduto() {
   const { segmento: slug } = useLocalSearchParams<{ segmento: string }>();
   const { width } = useWindowDimensions();
@@ -48,9 +59,11 @@ export default function PaginaProduto() {
   }, [definirRegra, regraSite]);
 
   if (!dados && carregando) return <Carregando />;
-  if (!dados) {
+  // Erro de cadastro no site: redirecionar para o próprio endereço da tela entraria em laço; vira "não encontrado".
+  const redirecionaParaSi = dados?.redirecionar !== undefined && caminhoDe(dados.redirecionar) === `/${slug}/p`;
+  if (!dados || redirecionaParaSi) {
     // Conjunto, produto encerrado (410) ou endereço que o app não conhece: a página do site resolve (301, 410, conjunto).
-    if (status === 404 || status === 410 || (codigo && ABRIR_NO_SITE.includes(codigo)))
+    if (redirecionaParaSi || status === 404 || status === 410 || (codigo && ABRIR_NO_SITE.includes(codigo)))
       return <AbrirNoSite caminho={`/${encodeURIComponent(slug)}/p`} />;
     return <Erro mensagem={erro ?? ''} tentar={recarregar} />;
   }

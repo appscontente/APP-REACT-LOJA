@@ -1,7 +1,7 @@
 import { Fredoka_500Medium, Fredoka_600SemiBold } from '@expo-google-fonts/fredoka';
 import { Manrope_400Regular, Manrope_600SemiBold, Manrope_700Bold } from '@expo-google-fonts/manrope';
 import { useFonts } from 'expo-font';
-import { DefaultTheme, Stack, ThemeProvider, type ErrorBoundaryProps } from 'expo-router';
+import { DefaultTheme, router, Stack, ThemeProvider, type ErrorBoundaryProps } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
@@ -9,7 +9,7 @@ import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { BotaoFigital } from '@/componentes/botao-figital';
-import { Erro } from '@/componentes/estado-tela';
+import { Aviso } from '@/componentes/estado-tela';
 import { ProvedorBoasVindas } from '@/estado/boas-vindas';
 import { ProvedorCarrinho } from '@/estado/carrinho';
 import { ProvedorConta } from '@/estado/conta';
@@ -23,11 +23,30 @@ export const unstable_settings = { anchor: '(abas)' };
 
 SplashScreen.preventAutoHideAsync();
 
-/** Erro inesperado numa tela (dado diferente do esperado, por exemplo) não fecha o app: mostra a tela de erro. */
+/**
+ * Erro inesperado (dado diferente do esperado, por exemplo) não fecha o app: mostra a tela de erro. Vale para cada tela
+ * (prop da Stack abaixo, o cabeçalho com voltar e o botão da loja continuam) e para erro no próprio layout.
+ */
 export function ErrorBoundary({ retry }: ErrorBoundaryProps) {
   return (
     <View style={{ flex: 1, backgroundColor: cores.fundo }}>
-      <Erro mensagem="Algo deu errado nesta tela. Tente de novo." tentar={retry} />
+      {/* "Ir para o início" fica no meio, junto do "Tentar de novo", longe do botão da loja no canto de baixo. Se a tela
+          quebrar de novo, o cliente não fica preso: volta para o Início (que já está por baixo, pela âncora). */}
+      <Aviso
+        titulo="Algo não carregou"
+        texto="Algo deu errado nesta tela. Tente de novo."
+        acao="Tentar de novo"
+        aoTocar={retry}
+        secundaria={{
+          titulo: 'Ir para o início',
+          aoTocar: () => {
+            router.dismissTo('/');
+            // Erro no próprio layout: limpa a tela de erro para a navegação aparecer de novo.
+            retry();
+          },
+        }}
+        triste
+      />
     </View>
   );
 }
@@ -56,7 +75,9 @@ export default function Raiz() {
                     <View style={{ flex: 1 }}>
                       {/* Texto escuro na barra de status; o Início (topo vermelho), o leitor e o pedido recebido trocam para claro. */}
                       <StatusBar style="dark" />
+                      {/* Cada tela tem a própria barreira de erro: um erro numa tela não troca o app inteiro. */}
                       <Stack
+                        unstable_screenErrorBoundary={ErrorBoundary}
                         screenOptions={{
                           title: '',
                           headerTintColor: cores.texto,

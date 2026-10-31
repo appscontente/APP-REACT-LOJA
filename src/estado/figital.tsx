@@ -33,6 +33,12 @@ export type ComprovanteLoja = {
 
 const valido = (c: ComprovanteLoja | undefined) => (c && Date.parse(c.expiraEm) > Date.now() ? c : undefined);
 
+/** Tira os comprovantes vencidos; devolve null quando nenhum saiu (quem chama não muda o estado à toa). */
+function semVencidos(todos: Record<string, ComprovanteLoja>) {
+  const vigentes = Object.fromEntries(Object.entries(todos).filter(([, c]) => valido(c)));
+  return Object.keys(vigentes).length === Object.keys(todos).length ? null : vigentes;
+}
+
 type Contexto = {
   lojas: LojaFisica[];
   /** A lista de lojas não veio (sem internet) e não há uma guardada no celular. */
@@ -43,6 +49,8 @@ type Contexto = {
   porEmpresa: (codigoEmpresa: number) => LojaFisica | undefined;
   /** Busca a lista de lojas se ainda não tem. Rejeita quando a rede falha (quem chama mostra "Sem conexão"). */
   carregarLojas: () => Promise<LojaFisica[]>;
+  /** Busca a lista no site mesmo já tendo uma (a guardada pode ser velha). Rejeita quando a rede falha. */
+  atualizarLojas: () => Promise<LojaFisica[]>;
   /** Comprovante do caixa da loja, só enquanto a reserva vale. */
   comprovante: (slug: string) => ComprovanteLoja | undefined;
   guardarComprovante: (slug: string, c: ComprovanteLoja) => void;
@@ -90,9 +98,9 @@ export function ProvedorFigital({ children }: { children: ReactNode }) {
       if (g && !vale) gravar(CHAVE, null);
     });
     ler<Record<string, ComprovanteLoja>>(CHAVE_COMPROVANTES, {}).then((todos) => {
-      const vigentes = Object.fromEntries(Object.entries(todos).filter(([, c]) => valido(c)));
-      setComprovantes(vigentes);
-      if (Object.keys(vigentes).length !== Object.keys(todos).length) gravar(CHAVE_COMPROVANTES, vigentes);
+      const vigentes = semVencidos(todos);
+      setComprovantes(vigentes ?? todos);
+      if (vigentes) gravar(CHAVE_COMPROVANTES, vigentes);
     });
     // A última lista guardada abre o modo loja na hora, mesmo sem internet; a da rede substitui quando chegar.
     ler<LojaFisica[]>(CHAVE_LOJAS, []).then((salvas) => {
@@ -101,14 +109,36 @@ export function ProvedorFigital({ children }: { children: ReactNode }) {
     buscarLojas().catch(() => undefined);
   }, []);
 
-  // Sem lista (a abertura foi sem internet): tenta de novo quando o cliente volta ao app.
+  // Sem lista, ou só com a guardada porque a busca falhou (abertura sem internet): tenta de novo quando o cliente volta
+  // ao app. O buscarLojas zera o erro no começo; o efeito só assina o AppState, então não entra em laço.
   useEffect(() => {
-    if (lojas.length) return;
+    if (lojas.length && !erroLojas) return;
     const assinatura = AppState.addEventListener('change', (estado) => {
       if (estado === 'active') buscarLojas().catch(() => undefined);
     });
     return () => assinatura.remove();
-  }, [lojas.length]);
+  }, [lojas.length, erroLojas]);
+
+  // O comprovante sai sozinho quando a reserva vence: com o app aberto (timer até o primeiro que vence) e ao voltar ao
+  // app (o timer não corre em segundo plano). Só muda o estado se algum saiu, para não entrar em laço.
+  useEffect(() => {
+    const limpar = () => {
+      const vigentes = semVencidos(comprovantes);
+      if (!vigentes) return;
+      setComprovantes(vigentes);
+      gravar(CHAVE_COMPROVANTES, vigentes);
+    };
+    const datas = Object.values(comprovantes).map((c) => Date.parse(c.expiraEm));
+    // Meio segundo de folga: o timer pode disparar um pouco antes da hora e o comprovante ainda valeria.
+    const timer = datas.length ? setTimeout(limpar, Math.max(0, Math.min(...datas) - Date.now()) + 500) : undefined;
+    const assinatura = AppState.addEventListener('change', (estado) => {
+      if (estado === 'active') limpar();
+    });
+    return () => {
+      clearTimeout(timer);
+      assinatura.remove();
+    };
+  }, [comprovantes]);
 
   const valor = useMemo<Contexto>(
     () => ({
@@ -126,6 +156,7 @@ export function ProvedorFigital({ children }: { children: ReactNode }) {
       },
       porEmpresa: (codigoEmpresa) => lojas.find((l) => l.codigoEmpresa === codigoEmpresa),
       carregarLojas,
+      atualizarLojas: buscarLojas,
       comprovante: (slug) => valido(comprovantes[slug]),
       guardarComprovante: (slug, c) => {
         const novos = { ...comprovantes, [slug]: c };

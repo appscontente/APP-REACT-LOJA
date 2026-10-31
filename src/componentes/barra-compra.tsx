@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useEffectEvent, type ReactNode } from 'react';
+import { useIsFocused } from 'expo-router';
+import { useEffect, useEffectEvent, useSyncExternalStore, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -23,6 +24,29 @@ export function BarraCompra({ aoConversar, aviso, children }: { aoConversar: () 
   );
 }
 
+// Quantos avisos de carrinho estão abertos: o botão da loja (BotaoFigital, fora da tela) some enquanto há algum, para
+// não cobrir o "Ver carrinho". Contador e não booleano porque a página antiga e a nova podem se cruzar na troca.
+let avisosAbertos = 0;
+const ouvintes = new Set<() => void>();
+function avisarOuvintes() {
+  ouvintes.forEach((ouvinte) => ouvinte());
+}
+// Fora do componente, para serem estáveis e o useSyncExternalStore não reassinar a cada render.
+function assinarAvisos(ouvinte: () => void) {
+  ouvintes.add(ouvinte);
+  return () => {
+    ouvintes.delete(ouvinte);
+  };
+}
+function lerAvisos() {
+  return avisosAbertos > 0;
+}
+
+/** true enquanto o aviso "Adicionado ao carrinho" está na tela. */
+export function useAvisoCarrinhoAberto() {
+  return useSyncExternalStore(assinarAvisos, lerAvisos, lerAvisos);
+}
+
 /**
  * Aviso curto depois de adicionar ao carrinho: o cliente fica na página e escolhe "Ver carrinho" ou "Continuar
  * comprando". Some sozinho depois de alguns segundos (use `key` para reiniciar a contagem a cada toque).
@@ -44,6 +68,18 @@ export function AvisoCarrinho({
     const espera = setTimeout(() => fechar(), 8000);
     return () => clearTimeout(espera);
   }, []);
+  // Só conta com a página do produto em foco: com outra tela por cima (outro produto do "Combina com", por exemplo), o
+  // aviso escondido não tira o botão da loja de lá.
+  const focado = useIsFocused();
+  useEffect(() => {
+    if (!focado) return;
+    avisosAbertos += 1;
+    avisarOuvintes();
+    return () => {
+      avisosAbertos -= 1;
+      avisarOuvintes();
+    };
+  }, [focado]);
   return (
     <View style={[estilos.aviso, { backgroundColor: limite ? cores.avisoFundo : cores.sucessoFundo }]}>
       <View style={estilos.linha}>

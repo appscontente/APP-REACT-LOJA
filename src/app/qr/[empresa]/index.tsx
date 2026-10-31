@@ -4,26 +4,28 @@ import { useEffect, useState } from 'react';
 import { Aviso, Carregando } from '@/componentes/estado-tela';
 import { useFigital } from '@/estado/figital';
 import { rotaLoja } from '@/lib/rotas';
+import type { LojaFisica } from '@/lib/tipos';
 
 type Situacao = { tipo: 'carregando' } | { tipo: 'ir'; destino: string } | { tipo: 'sem-conexao' } | { tipo: 'outra-empresa' };
 
 /** QR da loja (/qr/{CODEMP}): entra no modo loja e abre o portal dela. */
 export default function QrLoja() {
   const { empresa } = useLocalSearchParams<{ empresa: string }>();
-  const { carregarLojas, entrar } = useFigital();
+  const { carregarLojas, atualizarLojas, entrar } = useFigital();
   const [situacao, setSituacao] = useState<Situacao>({ tipo: 'carregando' });
   const [tentativa, setTentativa] = useState(0);
   useEffect(() => {
     let ativo = true;
-    carregarLojas().then(
-      (lojas) => {
-        if (!ativo) return;
-        const loja = lojas.find((l) => l.codigoEmpresa === Number(empresa));
-        if (loja) entrar(loja.slug);
-        setSituacao(loja ? { tipo: 'ir', destino: rotaLoja(loja.slug) } : { tipo: 'outra-empresa' });
-      },
-      () => ativo && setSituacao({ tipo: 'sem-conexao' }),
-    );
+    (async () => {
+      const achar = (lojas: LojaFisica[]) => lojas.find((l) => l.codigoEmpresa === Number(empresa));
+      let lojas = await carregarLojas().catch(() => undefined);
+      // Fora da lista: ela pode ser a guardada no celular (velha). Busca no site uma vez antes de dizer que não é nossa.
+      if (lojas && !achar(lojas)) lojas = await atualizarLojas().catch(() => undefined);
+      if (!ativo) return;
+      const loja = lojas && achar(lojas);
+      if (loja) entrar(loja.slug);
+      setSituacao(!lojas ? { tipo: 'sem-conexao' } : loja ? { tipo: 'ir', destino: rotaLoja(loja.slug) } : { tipo: 'outra-empresa' });
+    })();
     return () => {
       ativo = false;
     };

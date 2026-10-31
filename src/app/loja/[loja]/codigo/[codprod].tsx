@@ -17,13 +17,13 @@ export default function CodigoNaLoja() {
       </>
     );
   if (!dados) {
-    // Sem status (ou 0), foi a rede que falhou: dá para tentar de novo. Com resposta do site, o código não existe na loja.
-    const semRede = !status;
+    // 404/410: o código não existe (ou saiu) nesta loja. Qualquer outra falha (rede ou erro do site) dá para tentar de novo.
+    const daParaTentar = status !== 404 && status !== 410;
     return (
       <>
         <Stack.Screen options={{ title: '' }} />
-        {semRede ? (
-          <Aviso titulo="Sem conexão" texto={erro} acao="Tentar de novo" aoTocar={recarregar} triste />
+        {daParaTentar ? (
+          <Aviso titulo="Algo não carregou" texto={erro} acao="Tentar de novo" aoTocar={recarregar} triste />
         ) : (
           <Aviso
             titulo="Código não encontrado"

@@ -6,7 +6,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 
 import { api, ErroApi } from '@/lib/api';
 import { gravar, ler } from '@/lib/armazenamento';
-import { DESCONTO_PIX, arredondar } from '@/lib/formatar';
+import { DESCONTO_PIX, arredondar, formatarPreco, nomeLegivel } from '@/lib/formatar';
 import type { CardProduto, OrigemSaida } from '@/lib/tipos';
 
 export type ItemCarrinho = Pick<
@@ -53,6 +53,14 @@ const ContextoCarrinho = createContext<Contexto | null>(null);
 
 /** Itens que entram na conta e no pedido (os indisponíveis ficam de fora). */
 export const disponiveis = (itens: ItemCarrinho[]) => itens.filter((i) => !i.indisponivel);
+
+/** Texto para o cliente de uma mudança achada na conferência do carrinho (site e loja). */
+export const textoMudanca = (m: MudancaCarrinho) => {
+  const nome = nomeLegivel(m.nome);
+  if (m.tipo === 'preco') return `O preço de ${nome} mudou de ${formatarPreco(m.de)} para ${formatarPreco(m.para)}.`;
+  if (m.tipo === 'quantidade') return `Ajustamos a quantidade de ${nome} ao que temos disponível.`;
+  return `${nome} ficou indisponível.`;
+};
 
 export function totais(todos: ItemCarrinho[]) {
   const itens = disponiveis(todos);
@@ -116,15 +124,23 @@ export function ProvedorCarrinho({ children }: { children: ReactNode }) {
       adicionar: (produto, destino = 'site', quantidade = 1) =>
         mudar(destino, (lista) => {
           const atual = lista.find((i) => i.codprod === produto.codprod);
-          const limite = Math.max(1, produto.estoque);
-          // Adicionar de novo traz o preço e a disponibilidade de agora.
-          if (atual)
-            return lista.map((i) =>
-              i.codprod === produto.codprod
-                ? { ...i, ...produto, quantidade: Math.min(limite, (i.indisponivel ? 0 : i.quantidade) + quantidade), indisponivel: false }
-                : i,
-            );
-          return [...lista, { ...produto, quantidade: Math.min(limite, quantidade) }];
+          if (!atual) return [...lista, { ...produto, quantidade: Math.min(Math.max(1, produto.estoque), quantidade) }];
+          // Adicionar de novo traz o preço e os dados de vitrine de agora. A saída (loja, CD, outra loja ou mostruário)
+          // que o cliente escolheu na loja fica: a página manda a saída padrão, que não deve apagar a escolha.
+          const novo: ItemCarrinho = { ...atual, ...produto, quantidade: atual.quantidade + quantidade, indisponivel: false };
+          if (atual.indisponivel) {
+            // Item que ficou indisponível: a saída nova vem inteira do produto, sem herdar o mostruário antigo.
+            novo.origemEstoque = produto.origemEstoque;
+            novo.mostruario = produto.mostruario;
+            novo.quantidade = quantidade;
+          } else if (atual.origemEstoque && produto.origemEstoque && atual.origemEstoque !== produto.origemEstoque) {
+            // Outra saída: fica a do item, com o limite dela.
+            novo.origemEstoque = atual.origemEstoque;
+            novo.estoque = atual.estoque;
+            novo.mostruario = atual.mostruario;
+          }
+          novo.quantidade = Math.min(Math.max(1, novo.estoque), novo.quantidade);
+          return lista.map((i) => (i.codprod === produto.codprod ? novo : i));
         }),
       alterar: (codprod, quantidade, destino = 'site') =>
         mudar(destino, (lista) =>
@@ -142,7 +158,9 @@ export function ProvedorCarrinho({ children }: { children: ReactNode }) {
   return <ContextoCarrinho.Provider value={valor}>{children}</ContextoCarrinho.Provider>;
 }
 
-type Atual = Partial<Pick<ItemCarrinho, 'nome' | 'preco' | 'precoDe' | 'descontoPix' | 'imagem' | 'estoque' | 'entregavel'>> & {
+type Atual = Partial<
+  Pick<ItemCarrinho, 'nome' | 'preco' | 'precoDe' | 'descontoPix' | 'imagem' | 'estoque' | 'entregavel' | 'origemEstoque' | 'mostruario'>
+> & {
   nome: string;
   preco: number;
   estoque: number;
@@ -166,13 +184,18 @@ async function conferirLoja(loja: string, lista: ItemCarrinho[]) {
     lista.map(async (i) => {
       try {
         const { produto: p, origem, entregavel } = await api.produtoNaLoja(loja, { codprod: i.codprod });
-        const limite =
-          !i.origemEstoque || i.origemEstoque === origem.origem
-            ? origem.disponivel
-            : origem.alternativa?.origem === i.origemEstoque
-              ? origem.alternativa.disponivel
-              : i.estoque;
+        const mesma = !i.origemEstoque || i.origemEstoque === origem.origem;
+        const alternativa = origem.alternativa?.origem === i.origemEstoque ? origem.alternativa : undefined;
+        // O site manda uma saída só, pela prioridade (CD, depois a loja, depois outra loja). Se a do item sumiu da resposta
+        // e a de agora tem estoque sem pergunta (não é peça única), o item passa para ela. Peça única ou nada em estoque:
+        // fica indisponível, e o cliente escolhe de novo na página do produto.
+        const troca = !mesma && !alternativa && !origem.aviso && origem.disponivel > 0 && origem.origem;
+        const limite = mesma || troca ? origem.disponivel : alternativa ? alternativa.disponivel : 0;
         const atual: Atual = { nome: p.nome, preco: p.preco, precoDe: p.precoDe, descontoPix: p.descontoPix, estoque: limite, entregavel };
+        if (troca) {
+          atual.origemEstoque = troca;
+          atual.mostruario = false;
+        }
         if (p.imagens[0]?.src) atual.imagem = p.imagens[0].src;
         novos.set(i.codprod, atual);
       } catch (e) {
