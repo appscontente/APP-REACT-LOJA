@@ -14,6 +14,8 @@ export type PedidoApp = {
   criadoEm: string;
   itens: ItemCarrinho[];
   total: number;
+  /** Frete cotado, cheio (0 na retirada); pedido antigo não tem. O desconto da promoção de frete está em `descontos.frete`. */
+  frete?: number;
   forma: 'pix' | 'cartao' | 'cartao-pix';
   entrega: 'entrega' | 'retirada';
   /** Como o site: "Pedido recebido, pagamento em análise" até a ClearSale e a captura. */
@@ -25,6 +27,12 @@ export type PedidoApp = {
   endereco?: { cep: string; logradouro: string; numero: string; complemento?: string; bairro: string; cidade: string; uf: string; referencia?: string };
   /** Pix que falta pagar (Pix sozinho ou cartão + Pix), com os nomes de pagamento.pendente.pix do contrato 17.12. */
   pix?: { valor: number; copiaECola?: string; imagemBase64?: string; expiraEm?: string };
+  /**
+   * Descontos que o checkout mostrou (o servidor recalcula no pedido real): promoções e cupom do site
+   * (POST /api/app/carrinho/calcular) ou, no pedido do carrinho da loja pago pelo app, o autoatendimento (coluna
+   * "site" do Happy), mais o desconto do Pix (`pix`) e o da promoção de frete (`frete`). Valores em reais, já somados.
+   */
+  descontos?: { promocoes?: number; cupom?: string; aplicadas?: string[]; autoatendimento?: number; frete?: number; pix?: number };
 };
 
 type Situacao = { texto: string; cor: string; fundo: string };

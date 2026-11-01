@@ -6,8 +6,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 
 import { api, ErroApi } from '@/lib/api';
 import { gravar, ler } from '@/lib/armazenamento';
+import { itemCarrinhoDoConjunto, type PecaConjuntoCarrinho } from '@/lib/conjuntos';
 import { DESCONTO_PIX, arredondar, formatarPreco, nomeLegivel } from '@/lib/formatar';
-import type { CardProduto, OrigemSaida } from '@/lib/tipos';
+import type { CardProduto, ConjuntoApp, ConjuntoCompleto, OrigemSaida } from '@/lib/tipos';
 
 export type ItemCarrinho = Pick<
   CardProduto,
@@ -22,6 +23,11 @@ export type ItemCarrinho = Pick<
   entregavel?: boolean;
   /** O site não tem mais o produto para vender (saiu do catálogo ou esgotou): fica fora dos totais e do pedido. */
   indisponivel?: boolean;
+  /**
+   * Linha de conjunto (cozinha, cama box, mesa + cadeiras): `codprod` é a chave da configuração (KIT-0001~a1b2c3),
+   * `preco` é o total do conjunto e as escolhas são as peças com o preço rateado. O pedido desce uma linha por peça.
+   */
+  conjunto?: { id: string; escolhas: PecaConjuntoCarrinho[] };
 };
 
 /** O que mudou num item quando o carrinho guardado foi conferido com o site. */
@@ -68,6 +74,19 @@ export function totais(todos: ItemCarrinho[]) {
   const pix = arredondar(itens.reduce((t, i) => t + i.preco * (1 - (i.descontoPix ?? DESCONTO_PIX)) * i.quantidade, 0));
   const economia = arredondar(itens.reduce((t, i) => t + ((i.precoDe ?? i.preco) - i.preco) * i.quantidade, 0));
   return { subtotal, pix, economia };
+}
+
+/**
+ * Desconto do Pix do site só nas linhas de conjunto. No carrinho da loja pago pelo app, o autoatendimento (Happy)
+ * substitui o desconto do Pix dos produtos que têm regra lá; o conjunto não tem (motivo "conjunto"), então mantém o
+ * do site, como se fosse comprado no site.
+ */
+export function descontoPixConjuntos(todos: ItemCarrinho[]) {
+  return arredondar(
+    disponiveis(todos)
+      .filter((i) => i.conjunto)
+      .reduce((t, i) => t + i.preco * (i.descontoPix ?? DESCONTO_PIX) * i.quantidade, 0),
+  );
 }
 
 export function ProvedorCarrinho({ children }: { children: ReactNode }) {
@@ -159,22 +178,74 @@ export function ProvedorCarrinho({ children }: { children: ReactNode }) {
 }
 
 type Atual = Partial<
-  Pick<ItemCarrinho, 'nome' | 'preco' | 'precoDe' | 'descontoPix' | 'imagem' | 'estoque' | 'entregavel' | 'origemEstoque' | 'mostruario'>
+  Pick<ItemCarrinho, 'nome' | 'preco' | 'precoDe' | 'descontoPix' | 'imagem' | 'estoque' | 'entregavel' | 'origemEstoque' | 'mostruario' | 'conjunto'>
 > & {
   nome: string;
   preco: number;
   estoque: number;
 };
 
+/**
+ * Linha de conjunto conferida de novo: a mesma configuração com o preço e o estoque de agora do conjunto que o site
+ * mandou (o do site ou o da loja). Sem conjunto, ou configuração que não serve mais, fica fora do mapa (indisponível).
+ */
+function conferirConjunto(
+  i: ItemCarrinho,
+  c: ConjuntoCompleto | undefined,
+  novos: Map<string, Atual>,
+  /** O que a resposta disse do conjunto: se pode ser pago pelo app (na loja, peça sem medidas = só no caixa) e a fração do Pix dele. */
+  extra: { entregavel: boolean; descontoPix?: number },
+) {
+  if (!c || !i.conjunto) return;
+  const novo = itemCarrinhoDoConjunto(c, i.conjunto.escolhas);
+  if (!novo || novo.codprod !== i.codprod) return;
+  const { nome, preco, precoDe, imagem, estoque, origemEstoque, mostruario, conjunto } = novo;
+  novos.set(i.codprod, {
+    nome,
+    preco,
+    precoDe,
+    imagem,
+    estoque,
+    origemEstoque,
+    mostruario,
+    conjunto,
+    entregavel: extra.entregavel,
+    // Sem a fração na resposta, a linha fica com a que já tinha (não troca por undefined).
+    ...(extra.descontoPix !== undefined && { descontoPix: extra.descontoPix }),
+  });
+}
+
 /** Carrinho do site: uma consulta com todos os códigos (GET /api/app/produtos?codprod=...). Fora da lista = saiu. */
 async function conferirSite(lista: ItemCarrinho[]) {
-  const produtos = await api.produtos({ codprods: lista.map((i) => i.codprod) });
-  return new Map<string, Atual>(
+  const avulsos = lista.filter((i) => !i.conjunto);
+  const conjuntos = lista.filter((i) => i.conjunto);
+  const [produtos] = await Promise.all([
+    avulsos.length ? api.produtos({ codprods: avulsos.map((i) => i.codprod) }) : Promise.resolve([]),
+  ]);
+  const novos = new Map<string, Atual>(
     produtos.map((p) => [
       p.codprod,
       { nome: p.nome, preco: p.preco, precoDe: p.precoDe, descontoPix: p.descontoPix, imagem: p.imagem, estoque: p.estoque },
     ]),
   );
+  // Conjuntos: uma consulta por conjunto (GET /api/app/conjuntos/{id}); 404 = saiu do site, o resto é falha de rede.
+  const ids = [...new Set(conjuntos.map((i) => i.conjunto!.id))];
+  const porId = new Map<string, ConjuntoApp | undefined>();
+  await Promise.all(
+    ids.map(async (id) => {
+      try {
+        porId.set(id, await api.conjunto(id));
+      } catch (e) {
+        if (!(e instanceof ErroApi && (e.status === 404 || e.status === 410))) throw e;
+        porId.set(id, undefined);
+      }
+    }),
+  );
+  for (const i of conjuntos) {
+    const resposta = porId.get(i.conjunto!.id);
+    conferirConjunto(i, resposta?.conjunto, novos, { entregavel: true, descontoPix: resposta?.taxaPix });
+  }
+  return novos;
 }
 
 /** Carrinho de uma loja (Figital): o limite é o da saída que o cliente escolheu (loja, CD ou outra loja). */
@@ -183,6 +254,14 @@ async function conferirLoja(loja: string, lista: ItemCarrinho[]) {
   await Promise.all(
     lista.map(async (i) => {
       try {
+        if (i.conjunto) {
+          // Conjunto na loja: a rota do produto na loja pelo ID do conjunto devolve o conjunto com o estoque da loja.
+          const resposta = await api.produtoNaLoja(loja, { codprod: i.conjunto.id });
+          // `entregavel` da resposta vale para o conjunto; o `produto` que vem junto é o conjunto visto como produto, e
+          // dele vale a fração do Pix.
+          conferirConjunto(i, resposta.conjunto, novos, { entregavel: resposta.entregavel, descontoPix: resposta.produto.descontoPix });
+          return;
+        }
         const { produto: p, origem, entregavel } = await api.produtoNaLoja(loja, { codprod: i.codprod });
         const mesma = !i.origemEstoque || i.origemEstoque === origem.origem;
         const alternativa = origem.alternativa?.origem === i.origemEstoque ? origem.alternativa : undefined;

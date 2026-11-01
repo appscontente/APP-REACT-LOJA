@@ -58,7 +58,8 @@ const estilos = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  texto: { minHeight: 40, paddingHorizontal: 8 },
+  // 44 pt: a área mínima de toque (o botão de descartar o comprovante e o de tirar do carrinho usam esta variante).
+  texto: { minHeight: 44, paddingHorizontal: 8 },
   conteudo: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rotulo: { fontFamily: fontes.titulo, fontSize: 16 },
 });

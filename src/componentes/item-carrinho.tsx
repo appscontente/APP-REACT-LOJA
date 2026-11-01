@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { AccessibilityInfo, Pressable, StyleSheet, View } from 'react-native';
 
 import { useCarrinho, type Destino, type ItemCarrinho as Item } from '@/estado/carrinho';
+import { resumoPecas } from '@/lib/conjuntos';
 import { formatarPreco, nomeLegivel } from '@/lib/formatar';
 import { rotaFigital, rotaProduto } from '@/lib/rotas';
 import { cores, raio } from '@/lib/tema';
@@ -15,15 +16,18 @@ export function ItemCarrinho({ item, destino = 'site' }: { item: Item; destino?:
   const { alterar, remover } = useCarrinho();
   // Tirar do carrinho pede confirmação (no "−" com 1 unidade e na lixeira), para um toque sem querer não apagar o item.
   const [confirmando, setConfirmando] = useState(false);
-  const href = destino === 'site' ? rotaProduto(item) : rotaFigital(destino, item.slug);
+  // Linha de conjunto: a foto e o nome levam à página do conjunto (item.slug é o dele), o preço já é o total dele.
+  const href = destino === 'site' ? rotaProduto({ slug: item.slug }) : rotaFigital(destino, item.slug);
   const nome = nomeLegivel(item.nome);
+  const conjunto = item.conjunto;
   const noLimite = item.quantidade >= item.estoque;
+  const unidades = (n: number) => (conjunto ? (n === 1 ? 'conjunto' : 'conjuntos') : n === 1 ? 'unidade' : 'unidades');
 
   const mudarQuantidade = (quantidade: number) => {
     if (quantidade < 1) return setConfirmando(true);
     if (quantidade > item.quantidade && noLimite) return;
     alterar(item.codprod, quantidade, destino);
-    AccessibilityInfo.announceForAccessibility(`${nome}: ${quantidade} ${quantidade === 1 ? 'unidade' : 'unidades'} no carrinho`);
+    AccessibilityInfo.announceForAccessibility(`${nome}: ${quantidade} ${unidades(quantidade)} no carrinho`);
   };
   const tirar = () => {
     remover(item.codprod, destino);
@@ -32,13 +36,23 @@ export function ItemCarrinho({ item, destino = 'site' }: { item: Item; destino?:
 
   return (
     <View style={[estilos.item, item.indisponivel && estilos.apagado]}>
-      <Pressable onPress={() => router.push(href as never)} accessibilityRole="link" accessibilityLabel={`Ver ${nome}`}>
+      <Pressable onPress={() => router.push(href as never)} accessibilityRole="link" accessibilityLabel={`Ver ${conjunto ? 'o conjunto ' : ''}${nome}`}>
         <Imagem uri={item.imagem} style={estilos.foto} />
       </Pressable>
       <View style={{ flex: 1, gap: 4 }}>
+        {conjunto ? (
+          <Texto variante="pequeno" cor={cores.textoSuave} style={estilos.tipo}>
+            Conjunto
+          </Texto>
+        ) : null}
         <Texto variante="rotulo" numberOfLines={2}>
           {nome}
         </Texto>
+        {conjunto ? (
+          <Texto variante="pequeno" cor={cores.textoSuave} numberOfLines={2}>
+            {resumoPecas(conjunto.escolhas.map((e) => ({ nome: nomeLegivel(e.nome), quantidade: e.quantidade })))}
+          </Texto>
+        ) : null}
         {item.sujeitoConfirmacao && !item.indisponivel ? (
           <Texto variante="pequeno" cor={cores.aviso}>
             Peça de exposição: a loja confirma antes da cobrança
@@ -133,6 +147,7 @@ const estilos = StyleSheet.create({
     borderColor: cores.borda,
   },
   apagado: { backgroundColor: cores.fundo },
+  tipo: { textTransform: 'uppercase', letterSpacing: 0.8 },
   foto: { width: 84, height: 84, borderRadius: raio.m, backgroundColor: '#fff' },
   acoes: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   quantidade: {

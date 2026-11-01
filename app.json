@@ -2,7 +2,10 @@
   "expo": {
     "name": "Casa Contente",
     "slug": "casa-contente",
-    "version": "0.1.0",
+    "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "casacontente",
@@ -21,7 +24,8 @@
       ],
       "infoPlist": {
         "NSCameraUsageDescription": "A câmera lê o QR code das etiquetas e o código de barras dos produtos na loja."
-      }
+      },
+      "buildNumber": "1"
     },
     "android": {
       "package": "br.com.casacontente.app",
@@ -60,7 +64,8 @@
             "DEFAULT"
           ]
         }
-      ]
+      ],
+      "versionCode": 1
     },
     "web": {
       "output": "single",

@@ -25,7 +25,10 @@ Sankhya → sync → Postgres → backend (FastAPI) → site (Next.js, rotas /ap
 | Parte | Situação |
 | --- | --- |
 | Início (banners com arte + banners automáticos do dia), categorias, busca com sugestões, produto, ofertas, frete por CEP | Dados reais do site |
-| Botão fixo "Na loja" (Figital): escolher a loja ou ler o QR, estoque CD x loja, carrinho por loja, comprovante com QR para o caixa | Dados reais do site; o comprovante ainda não cria o pedido no Sankhya |
+| Conjuntos (cozinha modulada, cama box, mesa + cadeiras): tela própria com o configurador, no site geral e dentro da loja | Dados reais do site (`/api/app/conjuntos`); o preço é recalculado pelo servidor no pedido |
+| Promoções e cupom no carrinho e no checkout, iguais aos do site | Dados reais do site (`POST /api/app/carrinho/calcular`) |
+| Orçamento do vendedor (`/orcamento/{token}`) e acompanhar entrega sem login (`/rastreio`) | Dados reais do site; com o backend, as rotas do site passam a ler o backend |
+| Botão fixo "Na loja" (Figital): escolher a loja ou ler o QR, de onde sai a peça, carrinho por loja, comprovantes com QR para o caixa (vários por loja), desconto do autoatendimento no caixa e pagando pelo app (tabela do Happy) | Dados reais do site; o comprovante ainda não cria o pedido no Sankhya e o desconto pelo app ainda não é aplicado pelo backend |
 | Boas-vindas na loja: 2 minutos perto de uma loja, o app dá as boas-vindas e entra no modo dela (liga na Conta) | Com o app aberto funciona até no Expo Go; com o app fechado (aviso no celular) só no app instalado pelo EAS |
 | Leitor de QR e código de barras (câmera) | Funciona; etiqueta `/qr/{CODEMP}/{CODPROD}` abre o produto na loja |
 | Conversa com a loja (no lugar do WhatsApp) | Demonstração no celular, com resposta automática; falta a rota no backend |
@@ -59,12 +62,17 @@ npx expo lint
 
 ## Publicar nas lojas
 
-Precisa das contas de desenvolvedor da empresa: Apple (US$ 99 por ano, pede o D-U-N-S da empresa) e Google Play
-(US$ 25 uma vez). Com elas, o build sai pelo EAS (`npx eas build`), e as chaves ficam no EAS, nunca no repositório.
+Guia completo em [docs/PUBLICACAO.md](docs/PUBLICACAO.md): contas de desenvolvedor da empresa (Apple, US$ 99 por ano,
+e Google Play, US$ 25 uma vez; as duas pedem o D-U-N-S), `eas init`, builds, textos da ficha, formulários de
+privacidade, declaração da localização em segundo plano e o checklist do que precisa estar pronto antes. O `eas.json`
+tem os perfis `development`, `preview` (APK para a equipe testar) e `production` (lojas); as chaves ficam no EAS, nunca
+no repositório. Correções só de tela saem depois pelo EAS Update, sem passar pela revisão das lojas.
 
 ## Organização
 
 - `src/app/`: telas (cada arquivo é uma rota, igual ao site).
 - `src/componentes/`: peças de tela (cabeçalho, card de produto, banner automático, botão da Figital…).
 - `src/estado/`: carrinho (site e um por loja), conta, conversas e loja atual da Figital.
-- `src/lib/`: tema da marca (vermelho, amarelo, Fredoka e Manrope), chamadas ao site, formatação de preço.
+- `src/lib/`: tema da marca (vermelho, amarelo, Fredoka e Manrope), chamadas ao site, formatação de preço, regras dos
+  conjuntos e do desconto do autoatendimento.
+- `docs/`: guia de publicação nas lojas.
