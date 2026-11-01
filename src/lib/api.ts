@@ -4,15 +4,21 @@
 
 import type {
   CardProduto,
+  ConjuntoApp,
+  ContextoCalculo,
   DescontoFigital,
   Departamento,
   Exposto,
   Inicio,
+  ItemCalculo,
   LojaFisica,
+  OrcamentoApp,
   Pagamento,
   Produto,
   ProdutoFigital,
+  RastreioApp,
   ResultadoBusca,
+  ResultadoCalculo,
 } from './tipos';
 
 export const SITE_URL = (process.env.EXPO_PUBLIC_SITE_URL ?? 'https://loja-casacontente.onrender.com').replace(/\/$/, '');
@@ -58,6 +64,25 @@ async function obter<T>(caminho: string, params?: Record<string, string | undefi
   return resposta.json() as Promise<T>;
 }
 
+/** POST em JSON ao site, com o mesmo tratamento de erro do `obter` (ErroApi com o código e a mensagem do site). */
+async function enviar<T>(caminho: string, corpo: unknown): Promise<T> {
+  let resposta: Response;
+  try {
+    resposta = await buscarComLimite(`${SITE_URL}${caminho}`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-Canal': 'app' },
+      body: JSON.stringify(corpo),
+    });
+  } catch {
+    throw new ErroApi(0, 'Sem conexão. Confira a internet e tente de novo.');
+  }
+  if (!resposta.ok) {
+    const erro = (await resposta.json().catch(() => undefined)) as { codigo?: string; mensagem?: string } | undefined;
+    throw new ErroApi(resposta.status, erro?.mensagem ?? 'Não conseguimos carregar agora. Tente de novo.', erro?.codigo);
+  }
+  return resposta.json() as Promise<T>;
+}
+
 export const api = {
   inicio: () => obter<Inicio>('/api/app/inicio'),
   departamentos: () => obter<Departamento[]>('/api/app/departamentos'),
@@ -80,10 +105,24 @@ export const api = {
     }),
   produto: (slug: string) =>
     obter<
-      | { produto: Produto; combinaCom: CardProduto[]; pagamento: Pagamento; redirecionar?: undefined }
+      | { produto: Produto; combinaCom: CardProduto[]; pagamento: Pagamento; redirecionar?: undefined; conjunto?: undefined }
+      // Slug de conjunto (cozinha, cama box, mesa + cadeiras): o app monta o conjunto na própria tela.
+      | (ConjuntoApp & { produto?: undefined; combinaCom?: undefined; redirecionar?: undefined })
       // Endereço antigo ou renomeado: o site manda o caminho novo (como o 301 da página).
-      | { redirecionar: string; produto?: undefined; combinaCom?: undefined; pagamento?: undefined }
+      | { redirecionar: string; produto?: undefined; combinaCom?: undefined; pagamento?: undefined; conjunto?: undefined }
     >(`/api/app/produtos/${encodeURIComponent(slug)}`),
+  /** Conjunto pelo slug ou pelo ID (KIT-0001), com o estoque do site. */
+  conjunto: (slugOuId: string) => obter<ConjuntoApp>(`/api/app/conjuntos/${encodeURIComponent(slugOuId)}`),
+  /**
+   * Promoções e cupom iguais ao site: o servidor recalcula o carrinho (preço dele, nunca o do app) e devolve os totais.
+   * Chamado a cada mudança do carrinho do site e no checkout; o pedido real recalcula de novo.
+   */
+  calcularCarrinho: (itens: ItemCalculo[], contexto: ContextoCalculo = {}) =>
+    enviar<ResultadoCalculo>('/api/app/carrinho/calcular', { itens, contexto }),
+  /** Orçamento do vendedor pelo token do link; 404 quando não existe. */
+  orcamento: (token: string) => obter<OrcamentoApp>(`/api/app/orcamentos/${encodeURIComponent(token)}`),
+  /** Acompanhar entrega sem login: número do pedido + CPF ou e-mail da compra; 404 com mensagem genérica. */
+  rastrear: (numero: string, documento: string) => enviar<RastreioApp>('/api/app/rastreio', { numero, documento }),
   busca: (termo: string, ordenacao?: string) => obter<ResultadoBusca>('/api/app/busca', { q: termo, ordenacao }),
   sugestoes: (termo: string) =>
     obter<{ produtos: { nome: string; href: string; preco: number; imagem?: string }[]; categorias: { nome: string; href: string }[] }>(

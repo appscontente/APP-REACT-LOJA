@@ -1,5 +1,6 @@
 // Portal da loja no app (modo loja / Figital): endereço e horário, ler a etiqueta, conversar com os vendedores e as
-// peças expostas, com o estoque da loja e do CD.
+// peças expostas, com o estoque da loja e do CD. No topo, a faixa dos comprovantes do caixa desta loja que ainda valem
+// (pode haver mais de um: cada compra separada gera o seu), que abre o carrinho da loja no mais recente.
 
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -16,13 +17,13 @@ import { useConversas } from '@/estado/conversas';
 import { useLojas } from '@/estado/figital';
 import { api } from '@/lib/api';
 import { formatarHora } from '@/lib/formatar';
-import { rotaCarrinhoLoja, rotaFigital } from '@/lib/rotas';
+import { rotaFigital } from '@/lib/rotas';
 import { cores, fontes, raio } from '@/lib/tema';
 import { useDados } from '@/lib/use-dados';
 
 export default function PortalLoja() {
   const { loja: slug } = useLocalSearchParams<{ loja: string }>();
-  const { lojas, erroLojas, tentarLojas, entrar, comprovante } = useLojas();
+  const { lojas, erroLojas, tentarLojas, entrar, comprovantes } = useLojas();
   const { iniciar } = useConversas();
   const loja = lojas.find((l) => l.slug === slug);
   const [texto, setTexto] = useState('');
@@ -41,7 +42,13 @@ export default function PortalLoja() {
 
   if (!lojas.length) return erroLojas ? <Erro mensagem="Não conseguimos carregar as lojas." tentar={tentarLojas} /> : <Carregando />;
   if (!loja) return <Aviso titulo="Loja não encontrada" acao="Voltar ao início" aoTocar={() => router.dismissTo('/')} triste />;
-  const aberto = comprovante(loja.slug);
+  // Comprovantes do caixa desta loja ainda valendo, do mais recente para o mais antigo.
+  const abertos = comprovantes(loja.slug);
+  const tituloComprovantes = abertos.length === 1 ? '1 comprovante para pagar no caixa' : `${abertos.length} comprovantes para pagar no caixa`;
+  const detalheComprovantes =
+    abertos.length === 1
+      ? `Nº ${abertos[0].numero} · reserva até ${formatarHora(abertos[0].expiraEm)}`
+      : abertos.map((c) => `Nº ${c.numero} até ${formatarHora(c.expiraEm)}`).join(' · ');
 
   const conversar = () => {
     const id = iniciar({ loja: loja.slug, nomeLoja: loja.nome, assunto: 'Dúvida na loja' });
@@ -59,16 +66,18 @@ export default function PortalLoja() {
         hrefDe={(p) => rotaFigital(loja.slug, p.slug)}
         cabecalho={
           <View style={estilos.topo}>
-            {aberto ? (
+            {abertos.length ? (
               <Pressable
                 style={estilos.comprovante}
-                onPress={() => router.push(`${rotaCarrinhoLoja(loja.slug)}?comprovante=1` as never)}
-                accessibilityRole="button">
+                // Abre o carrinho da loja no comprovante mais recente ('1'); de lá dá para ver os outros.
+                onPress={() => router.push({ pathname: '/loja/[loja]/carrinho', params: { loja: loja.slug, comprovante: '1' } })}
+                accessibilityRole="button"
+                accessibilityLabel={`${tituloComprovantes}. ${detalheComprovantes}. Ver`}>
                 <Ionicons name="receipt-outline" size={22} color={cores.texto} />
                 <View style={{ flex: 1 }}>
-                  <Texto variante="rotulo">Seu comprovante Nº {aberto.numero}: mostrar no caixa</Texto>
-                  <Texto variante="pequeno" cor={cores.textoSuave}>
-                    Reserva até {formatarHora(aberto.expiraEm)}
+                  <Texto variante="rotulo">{tituloComprovantes}</Texto>
+                  <Texto variante="pequeno" cor={cores.textoSuave} numberOfLines={2}>
+                    {detalheComprovantes}
                   </Texto>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={cores.texto} />
@@ -97,8 +106,8 @@ export default function PortalLoja() {
               ) : null}
               <View style={estilos.desconto}>
                 <Texto variante="rotulo" cor={cores.sucesso}>
-                  Mega descontos no autoatendimento: finalizando no caixa sem vendedor, o desconto aparece no carrinho conforme
-                  a forma de pagamento.
+                  Mega descontos no autoatendimento: sem vendedor, o desconto aparece no carrinho conforme a forma de pagamento,
+                  pagando no caixa ou pelo app.
                 </Texto>
               </View>
               <BotaoSairDaLoja />

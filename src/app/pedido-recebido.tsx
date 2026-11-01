@@ -4,6 +4,7 @@ import { ActivityIndicator, Image, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Botao } from '@/componentes/botao';
+import { Copiar } from '@/componentes/copiar';
 import { Sorriso } from '@/componentes/logo';
 import { Texto } from '@/componentes/texto';
 import { useConta } from '@/estado/conta';
@@ -76,14 +77,17 @@ export default function PedidoRecebido() {
               />
             ) : null}
             {pix?.copiaECola ? (
-              <View style={estilos.codigo}>
-                <Texto variante="pequeno" cor={cores.textoSuave}>
-                  Pix copia e cola (toque e segure para copiar)
-                </Texto>
-                <Texto variante="pequeno" selectable numberOfLines={3}>
-                  {pix.copiaECola}
-                </Texto>
-              </View>
+              <>
+                <View style={estilos.codigo}>
+                  <Texto variante="pequeno" cor={cores.textoSuave}>
+                    Pix copia e cola: copie e cole no app do seu banco
+                  </Texto>
+                  <Texto variante="pequeno" selectable numberOfLines={3}>
+                    {pix.copiaECola}
+                  </Texto>
+                </View>
+                <Copiar texto={pix.copiaECola} />
+              </>
             ) : (
               <View style={estilos.pix}>
                 <Texto variante="pequeno" cor={cores.textoSuave} style={{ textAlign: 'center' }}>

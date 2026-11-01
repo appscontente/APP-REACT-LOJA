@@ -4,22 +4,27 @@ import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Botao } from '@/componentes/botao';
+import { Copiar } from '@/componentes/copiar';
 import { Aviso, Carregando } from '@/componentes/estado-tela';
 import { Imagem } from '@/componentes/imagem';
+import { Resumo } from '@/componentes/resumo';
 import { Texto } from '@/componentes/texto';
 import { situacaoDe, useConta, type PedidoApp } from '@/estado/conta';
 import { useConversas } from '@/estado/conversas';
 import { useFigital } from '@/estado/figital';
-import { formatarDataHora, formatarPreco, nomeLegivel } from '@/lib/formatar';
+import { arredondar, formatarDataHora, formatarPreco, nomeLegivel } from '@/lib/formatar';
 import { cores, raio } from '@/lib/tema';
 
 const ETAPAS = ['Pedido recebido', 'Pagamento aprovado', 'Em separação', 'Saiu para entrega', 'Entregue'];
 const ETAPAS_RETIRADA = ['Pedido recebido', 'Pagamento aprovado', 'Em separação', 'Pronto para retirar', 'Retirado'];
 
+/** Linha do Resumo: rótulo, valor e, opcionalmente, a cor do valor. */
+type Linha = [string, string, string?];
+
 /**
  * Pix que falta pagar (Pix sozinho ou cartão + Pix). Com o backend, o código, o QR e o prazo vêm de pagamento.pendente.pix
- * de GET /clientes/eu/pedidos/{numero} (contrato 17.12). O botão "Copiar código" pede o expo-clipboard, que ainda não está
- * no projeto: por enquanto o código é selecionável (tocar e segurar para copiar).
+ * de GET /clientes/eu/pedidos/{numero} (contrato 17.12). "Copiar código" copia o código para colar no app do banco; o
+ * texto continua selecionável para quem preferir.
  */
 function FaltaPagarPix({ pedido }: { pedido: PedidoApp }) {
   const valor = pedido.pix?.valor ?? (pedido.forma === 'pix' ? pedido.total : undefined);
@@ -40,8 +45,9 @@ function FaltaPagarPix({ pedido }: { pedido: PedidoApp }) {
           <Texto variante="pequeno" selectable style={estilos.codigo}>
             {copiaECola}
           </Texto>
+          <Copiar texto={copiaECola} />
           <Texto variante="pequeno" cor={cores.textoSuave}>
-            Toque e segure o código para copiar.
+            Copie e cole no app do seu banco.
           </Texto>
         </>
       ) : (
@@ -84,6 +90,23 @@ export default function Pedido() {
       />
     );
   const s = situacaoDe(pedido.situacao);
+  // A conta como o checkout mostrou: produtos, descontos em verde, frete (ou retirada) e o total, para o cliente
+  // conferir. Pedido antigo, sem o frete guardado, fica sem a linha do frete.
+  const d = pedido.descontos;
+  const produtos = arredondar(pedido.itens.reduce((t, i) => t + i.preco * i.quantidade, 0));
+  const linhas: Linha[] = [
+    [`Produtos (${pedido.itens.reduce((t, i) => t + i.quantidade, 0)})`, formatarPreco(produtos)],
+    ...(d?.promocoes ? [['Promoções', `- ${formatarPreco(d.promocoes)}`, cores.sucesso] as Linha] : []),
+    ...(d?.cupom ? [[`Cupom ${d.cupom}`, 'aplicado', cores.sucesso] as Linha] : []),
+    ...(d?.autoatendimento ? [['Autoatendimento (pagando pelo app)', `- ${formatarPreco(d.autoatendimento)}`, cores.sucesso] as Linha] : []),
+    ...(d?.pix ? [['Desconto no Pix', `- ${formatarPreco(d.pix)}`, cores.sucesso] as Linha] : []),
+    ...(pedido.entrega === 'retirada'
+      ? [['Retirada', 'grátis'] as Linha]
+      : pedido.frete !== undefined
+        ? [['Frete', pedido.frete > 0 ? formatarPreco(pedido.frete) : 'grátis'] as Linha]
+        : []),
+    ...(d?.frete ? [['Desconto no frete', `- ${formatarPreco(d.frete)}`, cores.sucesso] as Linha] : []),
+  ];
   return (
     <>
       <Stack.Screen options={{ title: `Pedido ${pedido.numero}` }} />
@@ -120,10 +143,7 @@ export default function Pedido() {
               </View>
             </View>
           ))}
-          <View style={estilos.total}>
-            <Texto variante="forte">Total</Texto>
-            <Texto variante="forte">{formatarPreco(pedido.total)}</Texto>
-          </View>
+          <Resumo linhas={linhas} total={pedido.total} />
         </View>
         <Botao
           titulo="Preciso de ajuda com este pedido"
@@ -151,5 +171,4 @@ const estilos = StyleSheet.create({
   qr: { width: 200, height: 200, alignSelf: 'center' },
   codigo: { backgroundColor: cores.fundoAlt, borderRadius: raio.m, padding: 10 },
   demonstracao: { borderRadius: raio.m, borderWidth: 1.5, borderStyle: 'dashed', borderColor: cores.borda, alignItems: 'center', justifyContent: 'center', padding: 16 },
-  total: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: cores.borda, paddingTop: 10 },
 });

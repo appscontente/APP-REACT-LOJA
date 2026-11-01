@@ -1,18 +1,20 @@
 // Modo loja (Figital): em qual loja física o cliente está. O botão fixo abre a loja guardada aqui; ler o QR de uma
 // etiqueta ou da loja troca a loja. Sai sozinho depois de 4 horas, para o cliente não abrir o app em casa no modo loja.
-// Também guarda a última lista de lojas (para abrir sem internet) e o comprovante do caixa de cada loja, até a reserva
-// vencer.
+// Também guarda a última lista de lojas (para abrir sem internet) e os comprovantes do caixa de cada loja (pode haver
+// mais de um por loja: cada compra separada gera o seu), até a reserva de cada um vencer.
 
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 
 import { api } from '@/lib/api';
-import { gravar, ler } from '@/lib/armazenamento';
+import { apagar, gravar, ler } from '@/lib/armazenamento';
 import type { LojaFisica, PagamentoFigital } from '@/lib/tipos';
 
 const CHAVE = 'figital:v1';
 const CHAVE_LOJAS = 'figital:lojas:v1';
-const CHAVE_COMPROVANTES = 'figital:comprovantes:v1';
+/** v2: lista de comprovantes por loja. A v1 guardava um só por loja e é migrada na primeira abertura. */
+const CHAVE_COMPROVANTES = 'figital:comprovantes:v2';
+const CHAVE_COMPROVANTES_V1 = 'figital:comprovantes:v1';
 const VALIDADE_MS = 4 * 60 * 60 * 1000;
 
 type Guardado = { loja: string; desde: number } | null;
@@ -23,6 +25,8 @@ type Guardado = { loja: string; desde: number } | null;
  */
 export type ComprovanteLoja = {
   numero: string;
+  /** Quando foi gerado (ISO). Comprovantes antigos, de antes deste campo, não têm. */
+  criadoEm?: string;
   expiraEm: string;
   total: number;
   /** Desconto do autoatendimento combinado para a forma de pagamento escolhida. */
@@ -31,12 +35,33 @@ export type ComprovanteLoja = {
   itens: { nome: string; quantidade: number }[];
 };
 
-const valido = (c: ComprovanteLoja | undefined) => (c && Date.parse(c.expiraEm) > Date.now() ? c : undefined);
+/** Comprovantes por loja (slug), do mais recente para o mais antigo. */
+type Comprovantes = Record<string, ComprovanteLoja[]>;
+
+const valido = (c: ComprovanteLoja) => Date.parse(c.expiraEm) > Date.now();
 
 /** Tira os comprovantes vencidos; devolve null quando nenhum saiu (quem chama não muda o estado à toa). */
-function semVencidos(todos: Record<string, ComprovanteLoja>) {
-  const vigentes = Object.fromEntries(Object.entries(todos).filter(([, c]) => valido(c)));
-  return Object.keys(vigentes).length === Object.keys(todos).length ? null : vigentes;
+function semVencidos(todos: Comprovantes): Comprovantes | null {
+  let mudou = false;
+  const vigentes: Comprovantes = {};
+  for (const [slug, lista] of Object.entries(todos)) {
+    const vivos = lista.filter(valido);
+    if (vivos.length !== lista.length) mudou = true;
+    if (vivos.length) vigentes[slug] = vivos;
+    else mudou = true;
+  }
+  return mudou ? vigentes : null;
+}
+
+/** Lê os comprovantes guardados; a primeira vez depois da atualização converte o formato antigo (um por loja). */
+async function lerComprovantes(): Promise<Comprovantes> {
+  const v2 = await ler<Comprovantes | null>(CHAVE_COMPROVANTES, null);
+  if (v2) return v2;
+  const v1 = await ler<Record<string, ComprovanteLoja>>(CHAVE_COMPROVANTES_V1, {});
+  const convertidos = Object.fromEntries(Object.entries(v1).map(([slug, c]) => [slug, [c]]));
+  if (Object.keys(convertidos).length) await gravar(CHAVE_COMPROVANTES, convertidos);
+  apagar([CHAVE_COMPROVANTES_V1]);
+  return convertidos;
 }
 
 type Contexto = {
@@ -51,10 +76,15 @@ type Contexto = {
   carregarLojas: () => Promise<LojaFisica[]>;
   /** Busca a lista no site mesmo já tendo uma (a guardada pode ser velha). Rejeita quando a rede falha. */
   atualizarLojas: () => Promise<LojaFisica[]>;
-  /** Comprovante do caixa da loja, só enquanto a reserva vale. */
+  /** Comprovante mais recente do caixa da loja, só enquanto a reserva vale. */
   comprovante: (slug: string) => ComprovanteLoja | undefined;
+  /** Todos os comprovantes vigentes da loja, do mais recente para o mais antigo. */
+  comprovantes: (slug: string) => ComprovanteLoja[];
+  /** Comprovantes vigentes de todas as lojas (Meus pedidos), do mais recente para o mais antigo. */
+  todosComprovantes: () => { loja: string; comprovante: ComprovanteLoja }[];
   guardarComprovante: (slug: string, c: ComprovanteLoja) => void;
-  descartarComprovante: (slug: string) => void;
+  /** Tira um comprovante (pelo número) depois de pago; sem número, o mais recente. */
+  descartarComprovante: (slug: string, numero?: string) => void;
 };
 
 const ContextoFigital = createContext<Contexto | null>(null);
@@ -63,7 +93,7 @@ export function ProvedorFigital({ children }: { children: ReactNode }) {
   const [lojas, setLojas] = useState<LojaFisica[]>([]);
   const [erroLojas, setErroLojas] = useState(false);
   const [guardado, setGuardado] = useState<Guardado>(null);
-  const [comprovantes, setComprovantes] = useState<Record<string, ComprovanteLoja>>({});
+  const [comprovantes, setComprovantes] = useState<Comprovantes>({});
   // Uma busca só por vez, mesmo com várias telas pedindo a lista ao mesmo tempo.
   const buscando = useRef<Promise<LojaFisica[]> | null>(null);
 
@@ -97,7 +127,7 @@ export function ProvedorFigital({ children }: { children: ReactNode }) {
       // Vencido: apaga, para não ficar no celular a loja e a hora da visita.
       if (g && !vale) gravar(CHAVE, null);
     });
-    ler<Record<string, ComprovanteLoja>>(CHAVE_COMPROVANTES, {}).then((todos) => {
+    lerComprovantes().then((todos) => {
       const vigentes = semVencidos(todos);
       setComprovantes(vigentes ?? todos);
       if (vigentes) gravar(CHAVE_COMPROVANTES, vigentes);
@@ -128,7 +158,9 @@ export function ProvedorFigital({ children }: { children: ReactNode }) {
       setComprovantes(vigentes);
       gravar(CHAVE_COMPROVANTES, vigentes);
     };
-    const datas = Object.values(comprovantes).map((c) => Date.parse(c.expiraEm));
+    const datas = Object.values(comprovantes)
+      .flat()
+      .map((c) => Date.parse(c.expiraEm));
     // Meio segundo de folga: o timer pode disparar um pouco antes da hora e o comprovante ainda valeria.
     const timer = datas.length ? setTimeout(limpar, Math.max(0, Math.min(...datas) - Date.now()) + 500) : undefined;
     const assinatura = AppState.addEventListener('change', (estado) => {
@@ -140,8 +172,13 @@ export function ProvedorFigital({ children }: { children: ReactNode }) {
     };
   }, [comprovantes]);
 
-  const valor = useMemo<Contexto>(
-    () => ({
+  const valor = useMemo<Contexto>(() => {
+    const vigentes = (slug: string) => (comprovantes[slug] ?? []).filter(valido);
+    const trocar = (novos: Comprovantes) => {
+      setComprovantes(novos);
+      gravar(CHAVE_COMPROVANTES, novos);
+    };
+    return {
       lojas,
       erroLojas: erroLojas && !lojas.length,
       lojaAtual: guardado ? lojas.find((l) => l.slug === guardado.loja) : undefined,
@@ -157,22 +194,25 @@ export function ProvedorFigital({ children }: { children: ReactNode }) {
       porEmpresa: (codigoEmpresa) => lojas.find((l) => l.codigoEmpresa === codigoEmpresa),
       carregarLojas,
       atualizarLojas: buscarLojas,
-      comprovante: (slug) => valido(comprovantes[slug]),
-      guardarComprovante: (slug, c) => {
-        const novos = { ...comprovantes, [slug]: c };
-        setComprovantes(novos);
-        gravar(CHAVE_COMPROVANTES, novos);
-      },
-      descartarComprovante: (slug) => {
+      comprovante: (slug) => vigentes(slug)[0],
+      comprovantes: vigentes,
+      todosComprovantes: () =>
+        Object.entries(comprovantes)
+          .flatMap(([loja, lista]) => lista.filter(valido).map((comprovante) => ({ loja, comprovante })))
+          .sort((a, b) => Date.parse(b.comprovante.criadoEm ?? b.comprovante.expiraEm) - Date.parse(a.comprovante.criadoEm ?? a.comprovante.expiraEm)),
+      guardarComprovante: (slug, c) => trocar({ ...comprovantes, [slug]: [c, ...(comprovantes[slug] ?? [])] }),
+      descartarComprovante: (slug, numero) => {
+        const lista = vigentes(slug);
+        const alvo = numero ?? lista[0]?.numero;
+        const restantes = lista.filter((c) => c.numero !== alvo);
         const novos = { ...comprovantes };
-        delete novos[slug];
-        setComprovantes(novos);
-        gravar(CHAVE_COMPROVANTES, novos);
+        if (restantes.length) novos[slug] = restantes;
+        else delete novos[slug];
+        trocar(novos);
       },
-    }),
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [lojas, erroLojas, guardado, comprovantes],
-  );
+  }, [lojas, erroLojas, guardado, comprovantes]);
 
   return <ContextoFigital.Provider value={valor}>{children}</ContextoFigital.Provider>;
 }

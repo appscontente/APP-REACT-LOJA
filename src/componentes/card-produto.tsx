@@ -13,17 +13,23 @@ import { Preco } from './preco';
 import { Selo } from './selo';
 import { Texto } from './texto';
 
-/** Card da vitrine: foto, selos, nome, preço de/por, Pix e parcelas, com o coração dos favoritos. */
+/**
+ * Card da vitrine: foto, selos, nome, preço de/por, Pix e parcelas, com o coração dos favoritos. Conjunto (cozinha,
+ * cama box, mesa + cadeiras) ganha o selo "Conjunto" e o preço "a partir de" (o da combinação padrão); sem coração,
+ * porque os favoritos buscam por CODPROD de produto e o conjunto tem código próprio (KIT-...).
+ */
 export function CardProduto({ produto, largura, href }: { produto: Dados; largura?: number; href?: string }) {
   const { favorito, alternarFavorito } = useConta();
   const desconto = descontoExibido(produto);
-  const marcado = favorito(produto.codprod);
+  const conjunto = produto.tipo === 'conjunto';
+  const marcado = !conjunto && favorito(produto.codprod);
   const regra = useRegraPagamento();
   const disponivel = produto.estoque > 0;
   // O rótulo substitui o conteúdo para o leitor de tela: nome legível, preço (ou esgotado) e desconto.
   const rotulo = [
+    conjunto ? 'Conjunto' : '',
     nomeLegivel(produto.nome),
-    disponivel ? formatarPreco(produto.preco) : 'esgotado',
+    disponivel ? `${conjunto ? 'a partir de ' : ''}${formatarPreco(produto.preco)}` : 'esgotado',
     desconto > 0 ? `${desconto}% de desconto` : '',
   ]
     .filter(Boolean)
@@ -35,24 +41,27 @@ export function CardProduto({ produto, largura, href }: { produto: Dados; largur
         style={[estilos.card, largura ? { width: largura } : { flex: 1 }]}
         accessibilityLabel={rotulo}
         // No iPhone o VoiceOver não chega ao coração dentro do card: o favorito vira uma ação do próprio card.
-        accessibilityActions={[{ name: 'favorito', label: marcado ? 'Tirar dos favoritos' : 'Guardar nos favoritos' }]}
+        accessibilityActions={conjunto ? undefined : [{ name: 'favorito', label: marcado ? 'Tirar dos favoritos' : 'Guardar nos favoritos' }]}
         onAccessibilityAction={(e) => {
-          if (e.nativeEvent.actionName === 'favorito') alternarFavorito(produto.codprod);
+          if (e.nativeEvent.actionName === 'favorito' && !conjunto) alternarFavorito(produto.codprod);
         }}>
         <View style={estilos.foto}>
           <Imagem uri={produto.imagem} style={estilos.imagem} accessibilityIgnoresInvertColors />
           <View style={estilos.selos}>
+            {conjunto && <Selo texto="Conjunto" cor="escuro" />}
             {desconto > 0 && <Selo texto={`${desconto}% OFF`} />}
             {produto.selos?.slice(0, 1).map((s) => <Selo key={s.texto} texto={s.texto} cor={s.cor} />)}
           </View>
-          <Pressable
-            hitSlop={8}
-            onPress={() => alternarFavorito(produto.codprod)}
-            accessibilityRole="button"
-            accessibilityLabel={marcado ? 'Tirar dos favoritos' : 'Guardar nos favoritos'}
-            style={estilos.coracao}>
-            <Ionicons name={marcado ? 'heart' : 'heart-outline'} size={20} color={marcado ? cores.marca : cores.texto} />
-          </Pressable>
+          {conjunto ? null : (
+            <Pressable
+              hitSlop={8}
+              onPress={() => alternarFavorito(produto.codprod)}
+              accessibilityRole="button"
+              accessibilityLabel={marcado ? 'Tirar dos favoritos' : 'Guardar nos favoritos'}
+              style={estilos.coracao}>
+              <Ionicons name={marcado ? 'heart' : 'heart-outline'} size={20} color={marcado ? cores.marca : cores.texto} />
+            </Pressable>
+          )}
         </View>
         <View style={estilos.corpo}>
           <Texto variante="pequeno" cor={cores.textoSuave} numberOfLines={1}>
@@ -62,7 +71,14 @@ export function CardProduto({ produto, largura, href }: { produto: Dados; largur
             {nomeLegivel(produto.nome)}
           </Texto>
           {disponivel ? (
-            <Preco preco={produto.preco} precoDe={produto.precoDe} descontoPix={produto.descontoPix} pagamento={regra} />
+            <View>
+              {conjunto ? (
+                <Texto variante="pequeno" cor={cores.textoSuave}>
+                  a partir de
+                </Texto>
+              ) : null}
+              <Preco preco={produto.preco} precoDe={produto.precoDe} descontoPix={produto.descontoPix} pagamento={regra} />
+            </View>
           ) : (
             <Texto variante="forte" cor={cores.textoSuave}>
               Esgotado

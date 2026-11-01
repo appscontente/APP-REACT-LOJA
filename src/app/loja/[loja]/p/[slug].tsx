@@ -14,11 +14,14 @@ import { CabecalhoLoja } from '@/componentes/cabecalho-loja';
 import { Aviso, Carregando, Erro } from '@/componentes/estado-tela';
 import { Galeria } from '@/componentes/galeria';
 import { Preco } from '@/componentes/preco';
+import { TelaConjunto } from '@/componentes/tela-conjunto';
 import { Texto } from '@/componentes/texto';
 import { useCarrinho } from '@/estado/carrinho';
 import { useConversas } from '@/estado/conversas';
 import { useLojas } from '@/estado/figital';
+import { useRegraPagamento } from '@/estado/pagamento';
 import { api } from '@/lib/api';
+import { descontoAutoatendimento, maiorDesconto } from '@/lib/figital-descontos';
 import { arredondar, formatarPreco, nomeLegivel } from '@/lib/formatar';
 import { rotaCarrinhoLoja } from '@/lib/rotas';
 import { cores, raio } from '@/lib/tema';
@@ -62,9 +65,12 @@ export default function ProdutoNaLoja() {
   const { lojas, erroLojas, tentarLojas } = useLojas();
   const { adicionar, itens } = useCarrinho();
   const { iniciar } = useConversas();
+  // Parcelas na regra do site (a rota da loja não manda a do produto); o conjunto usa a mesma.
+  const regra = useRegraPagamento();
   const loja = lojas.find((l) => l.slug === slugLoja);
   const { dados, erro, carregando, recarregar } = useDados(() => api.produtoNaLoja(slugLoja, { slug }), [slugLoja, slug]);
-  const codprod = dados?.produto.codprod;
+  // Conjunto não tem desconto do autoatendimento (o Happy responde motivo "conjunto"): nem consulta.
+  const codprod = dados?.conjunto ? undefined : dados?.produto.codprod;
   const { dados: descontos } = useDados(
     () => (codprod ? api.descontos(slugLoja, [codprod]) : Promise.resolve({ itens: [] })),
     [slugLoja, codprod],
@@ -79,11 +85,27 @@ export default function ProdutoNaLoja() {
         {carregando ? <Carregando /> : <Erro mensagem={erro ?? ''} tentar={recarregar} />}
       </>
     );
+  // Conjunto (cozinha, cama box, mesa + cadeiras) visto pela loja: tela própria, com o estoque e a saída de cada peça
+  // da loja. O `produto` que vem junto é o conjunto visto como produto; dele só vale a fração do Pix.
+  if (dados.conjunto)
+    return (
+      <TelaConjunto
+        dados={{ conjunto: dados.conjunto, pagamento: regra, taxaPix: dados.produto.descontoPix }}
+        loja={loja}
+        entregavel={dados.entregavel}
+      />
+    );
   const { produto: p, origem } = dados;
   const nome = nomeLegivel(p.nome);
+  // Desconto do autoatendimento (Happy) deste item no Pix, nas duas colunas: no caixa e pagando pelo app.
   const tabela = descontos?.itens.find((d) => d.codprod === p.codprod);
-  const pixCaixa = tabela?.descontos.pix?.caixa ?? 0;
-  const melhor = tabela ? Math.max(0, ...Object.values(tabela.descontos).map((d) => d.caixa)) : 0;
+  const umaUnidade = [{ codprod: p.codprod, preco: p.preco, quantidade: 1 }];
+  const tabelas = tabela ? [tabela] : [];
+  const pctCaixa = tabela?.descontos.pix?.caixa ?? 0;
+  const pctApp = tabela?.descontos.pix?.site ?? 0;
+  const noCaixa = arredondar(p.preco - descontoAutoatendimento(umaUnidade, tabelas, 'pix', 'caixa'));
+  const peloApp = arredondar(p.preco - descontoAutoatendimento(umaUnidade, tabelas, 'pix', 'site'));
+  const maior = Math.max(maiorDesconto(tabela, 'caixa'), maiorDesconto(tabela, 'site'));
   const item = { ...p, imagem: p.imagens[0]?.src, estoque: origem.disponivel, origemEstoque: origem.origem, entregavel: dados.entregavel };
   // Já no carrinho: a escolha (mostruário ou outro lugar) foi feita na primeira vez. Item que ficou indisponível não
   // conta: a saída escolhida acabou e o cliente escolhe de novo.
@@ -117,18 +139,36 @@ export default function ProdutoNaLoja() {
             {p.marca} · etiqueta {p.codprod}
           </Texto>
           <Texto variante="titulo">{nome}</Texto>
-          {pixCaixa > 0 ? (
-            <Texto variante="rotulo" cor={cores.textoSuave}>
-              Pagando pelo app
-            </Texto>
-          ) : null}
-          <Preco preco={p.preco} precoDe={p.precoDe} descontoPix={p.descontoPix} tamanho="pagina" />
-          {pixCaixa > 0 ? (
+          {/* Com o item na tabela do Happy, o Pix da loja é o do bloco abaixo (no caixa e pelo app): o do site não entra. */}
+          <Preco preco={p.preco} precoDe={p.precoDe} descontoPix={tabela ? 0 : p.descontoPix} tamanho="pagina" />
+          {pctCaixa > 0 || pctApp > 0 ? (
             <View style={estilos.autoatendimento}>
-              <Texto variante="forte">No caixa da loja: {formatarPreco(arredondar(p.preco * (1 - pixCaixa / 100)))} no Pix ou dinheiro</Texto>
+              <Texto variante="rotulo">Desconto do autoatendimento</Texto>
+              <View style={estilos.colunas}>
+                <View style={estilos.coluna}>
+                  <Texto variante="pequeno" cor={cores.textoSuave}>
+                    No caixa
+                  </Texto>
+                  <Texto variante="forte">{formatarPreco(noCaixa)}</Texto>
+                  <Texto variante="pequeno">no Pix ou dinheiro{pctCaixa > 0 ? ` (${pct(pctCaixa)}% a menos)` : ', sem desconto'}</Texto>
+                </View>
+                <View style={estilos.coluna}>
+                  <Texto variante="pequeno" cor={cores.textoSuave}>
+                    Pagando pelo app
+                  </Texto>
+                  {pctApp > 0 ? (
+                    <>
+                      <Texto variante="forte">{formatarPreco(peloApp)}</Texto>
+                      <Texto variante="pequeno">no Pix ({pct(pctApp)}% a menos)</Texto>
+                    </>
+                  ) : (
+                    <Texto variante="pequeno">vale o preço do site, mostrado acima</Texto>
+                  )}
+                </View>
+              </View>
               <Texto variante="pequeno" cor={cores.textoSuave}>
-                {pct(pixCaixa)}% a menos pagando no caixa no Pix ou em dinheiro
-                {melhor > pixCaixa ? ` (até ${pct(melhor)}% conforme o pagamento)` : ''}. No crédito, o desconto muda com as parcelas.
+                {maior > Math.max(pctCaixa, pctApp) ? `Até ${pct(maior)}% conforme a forma de pagamento. ` : ''}No crédito, o desconto muda com as
+                parcelas.
               </Texto>
             </View>
           ) : null}
@@ -173,7 +213,9 @@ export default function ProdutoNaLoja() {
 
 const estilos = StyleSheet.create({
   corpo: { padding: 16, gap: 12 },
-  autoatendimento: { gap: 2, padding: 12, borderRadius: raio.m, backgroundColor: cores.creme },
+  autoatendimento: { gap: 8, padding: 12, borderRadius: raio.m, backgroundColor: cores.creme },
+  colunas: { flexDirection: 'row', gap: 12 },
+  coluna: { flex: 1, gap: 2 },
   saida: { flexDirection: 'row', gap: 8, padding: 12, borderRadius: raio.m, backgroundColor: cores.superficie, borderWidth: 1, borderColor: cores.borda },
   semDescricao: { gap: 12, padding: 16, borderRadius: raio.l, backgroundColor: cores.creme },
 });

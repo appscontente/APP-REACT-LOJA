@@ -16,6 +16,7 @@ import { Galeria } from '@/componentes/galeria';
 import { Prateleira } from '@/componentes/prateleira';
 import { Preco } from '@/componentes/preco';
 import { Selo } from '@/componentes/selo';
+import { TelaConjunto } from '@/componentes/tela-conjunto';
 import { Texto } from '@/componentes/texto';
 import { useCarrinho } from '@/estado/carrinho';
 import { useConta } from '@/estado/conta';
@@ -69,6 +70,8 @@ export default function PaginaProduto() {
   }
   // Endereço antigo ou renomeado: vai para o endereço novo, como o 301 do site.
   if (dados.redirecionar !== undefined) return <Redirect href={dados.redirecionar as Href} />;
+  // Conjunto (cozinha, cama box, mesa + cadeiras): tela própria, montada no app com as regras de lib/conjuntos.ts.
+  if (dados.conjunto !== undefined) return <TelaConjunto dados={dados} />;
   const { produto: p, combinaCom, pagamento } = dados;
   const desconto = descontoExibido(p);
   const nome = nomeLegivel(p.nome);
