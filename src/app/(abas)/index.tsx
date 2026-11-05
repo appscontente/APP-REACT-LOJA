@@ -15,6 +15,7 @@ import { Carregando, Erro } from '@/componentes/estado-tela';
 import { Imagem } from '@/componentes/imagem';
 import { MenuDaLoja } from '@/componentes/menu-da-loja';
 import { Prateleira } from '@/componentes/prateleira';
+import { StoriesAmbientes } from '@/componentes/stories-ambientes';
 import { Texto } from '@/componentes/texto';
 import { useDefinirRegraPagamento } from '@/estado/pagamento';
 import { api, SITE_URL } from '@/lib/api';
@@ -62,6 +63,8 @@ export default function Inicio() {
   const { width } = useWindowDimensions();
   const largura = Math.min(width, 600) - 32;
   const { dados, erro, carregando, recarregar } = useDados(() => api.inicio(), []);
+  // Stories dos ambientes das lojas (7 dias); falha ou lista vazia só esconde a fila.
+  const ambientes = useDados(() => api.ambientes(), []);
   const jaNaTela = dados ? [...dados.achados, ...dados.vitrines.flatMap((v) => v.produtos)].map((p) => p.codprod) : [];
   const mais = useMaisProdutos(dados?.departamentos ?? [], jaNaTela);
   const larguraCard = (largura - 12) / 2;
@@ -98,6 +101,7 @@ export default function Inicio() {
               refreshing={carregando}
               onRefresh={() => {
                 recarregar();
+                ambientes.recarregar();
                 // Novo sorteio no "Mais para você", que volta a carregar com a rolagem.
                 mais.reiniciar();
               }}
@@ -115,6 +119,8 @@ export default function Inicio() {
               ]}
             </Carrossel>
           </View>
+
+          <StoriesAmbientes grupos={ambientes.dados?.stories ?? []} />
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={estilos.departamentos}>
             {dados.departamentos.map((d) => (
@@ -151,9 +157,16 @@ export default function Inicio() {
           )}
 
           <View style={estilos.bloco}>
-            <Texto variante="secao" style={{ marginBottom: 12 }}>
-              Compre por ambiente
-            </Texto>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
+              <Texto variante="secao">Compre por ambiente</Texto>
+              {ambientes.dados?.ambientes.length ? (
+                <Pressable onPress={() => router.push('/ambientes' as never)} accessibilityRole="link" hitSlop={8}>
+                  <Texto variante="rotulo" cor={cores.marca}>
+                    Ambientes montados
+                  </Texto>
+                </Pressable>
+              ) : null}
+            </View>
             <View style={estilos.ambientes}>
               {AMBIENTES.map((a) => (
                 <Pressable
