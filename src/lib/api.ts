@@ -3,8 +3,10 @@
 // vendas do app nos relatórios.
 
 import type {
+  AmbienteApp,
   CardProduto,
   ConjuntoApp,
+  GrupoStories,
   ContextoCalculo,
   DescontoFigital,
   Departamento,
@@ -85,6 +87,8 @@ async function enviar<T>(caminho: string, corpo: unknown): Promise<T> {
 
 export const api = {
   inicio: () => obter<Inicio>('/api/app/inicio'),
+  /** Compre o ambiente: stories das lojas (7 dias, uma fila por loja) e a galeria inteira. */
+  ambientes: () => obter<{ stories: GrupoStories[]; ambientes: AmbienteApp[] }>('/api/app/ambientes'),
   departamentos: () => obter<Departamento[]>('/api/app/departamentos'),
   produtos: (filtro: {
     departamento?: string;

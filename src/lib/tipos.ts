@@ -297,3 +297,35 @@ export type PedidoRastreio = {
 export type PassoPedido = { etapa: EtapaPedido; feito: boolean; atual: boolean; quando?: string; detalhe?: string };
 
 export type RastreioApp = { pedido: PedidoRastreio; passos: PassoPedido[]; tom: 'ok' | 'erro' | 'andamento' };
+
+/** Produto marcado na foto de um ambiente (GET /api/app/ambientes, contrato 38.1 e 29.1). */
+export type ItemAmbiente = {
+  numero: number;
+  /** Posição da marcação em % da largura (x) e da altura (y) da foto. */
+  x: number;
+  y: number;
+  codprod: string;
+  slug: string;
+  nome: string;
+  preco: number;
+  precoDe?: number;
+  /** Sem foto: o app oferece "Pedir fotos e detalhes" pela conversa com a loja. */
+  foto?: string;
+  /** Rota do site: /{slug}/p ou, para o produto vendido só na loja, /loja/{loja}/p/{slug}. */
+  href: string;
+  soNaLoja: boolean;
+  disponivel: boolean;
+};
+
+/** Post de ambiente de uma loja ou de um parceiro (ou ambiente da equipe, sem loja). */
+export type AmbienteApp = {
+  slug: string;
+  nome: string;
+  legenda?: string;
+  autor?: { nome: string; tipo: 'loja' | 'parceiro' | 'equipe' };
+  loja?: { slug: string; nome: string };
+  imagem: { src: string; alt: string; largura?: number; altura?: number };
+  itens: ItemAmbiente[];
+};
+
+export type GrupoStories = { loja: { slug: string; nome: string }; stories: AmbienteApp[] };
