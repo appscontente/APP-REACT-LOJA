@@ -10,7 +10,6 @@ import { CartaoCofrinho } from '@/componentes/cofrinho';
 import { Texto } from '@/componentes/texto';
 import { useCofrinho } from '@/estado/cofrinho';
 import { api } from '@/lib/api';
-import { formatarPreco } from '@/lib/formatar';
 import { cores, raio } from '@/lib/tema';
 import { useDados } from '@/lib/use-dados';
 
@@ -21,10 +20,13 @@ export default function TelaCofrinhos() {
   const encerrados = cofrinhos.filter((c) => c.situacao !== 'aberto');
   const passos = [
     { icone: 'search' as const, texto: 'Abra um produto e toque em "Guardar no Cofrinho Contente".' },
-    { icone: 'lock-closed' as const, texto: `O preço à vista do dia fica garantido por ${r ? r.prazoDias : 90} dias.` },
+    {
+      icone: 'lock-closed' as const,
+      texto: `O preço à vista do dia fica garantido por ${r ? r.prazoDias : 90} dias: se a tabela subir, você ganha o desconto da diferença. Depois disso, o preço é recalculado pela tabela do dia, com o desconto à vista.`,
+    },
     {
       icone: 'add-circle' as const,
-      texto: `Deposite quanto e quando quiser${r ? `, a partir de ${formatarPreco(r.depositoMinimo)}` : ''}, no Pix, débito ou crédito à vista.`,
+      texto: 'Sem parcela fixa: deposite uma parcela, um pouco por dia ou por semana, no Pix, débito ou crédito à vista.',
     },
     { icone: 'home' as const, texto: 'Completou? Escolha entregar em casa ou retirar numa loja.' },
   ];

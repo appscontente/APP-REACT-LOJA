@@ -57,7 +57,6 @@ export default function DepositarCofrinho() {
         preco={alvo}
         falta={falta}
         primeiro={false}
-        sugestoes={[Math.min(falta, Math.ceil((falta / 3) * 100) / 100)]}
         titulo="Depositar"
         aoDepositar={(deposito) => {
           depositar(c.id, deposito);

@@ -97,7 +97,7 @@ export default function TelaCofrinho() {
         </Texto>
         {precosDoDia ? (
           <Texto variante="pequeno" cor={cores.aviso}>
-            O prazo do preço garantido acabou: vale o preço à vista de hoje.
+            O prazo do preço garantido acabou: o valor foi recalculado pela tabela de hoje, com o desconto à vista.
           </Texto>
         ) : null}
         <SituacaoGarantia cofrinho={c} />
