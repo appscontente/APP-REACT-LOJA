@@ -39,6 +39,8 @@ export type Produto = Omit<CardProduto, 'imagem'> & {
   videoYoutube?: string;
   lojasExposicao?: string[];
   vendeIndividualmente?: boolean;
+  /** Liberado para o Cofrinho Contente no admin do site (todos começam desligados). Só com true o botão aparece. */
+  cofrinho?: boolean;
 };
 
 export type Pagamento = {
@@ -339,3 +341,35 @@ export type AmbienteApp = {
 };
 
 export type GrupoStories = { loja: { slug: string; nome: string }; stories: AmbienteApp[] };
+
+/** Forma de depósito do Cofrinho Contente: Pix (e.Rede) ou no caixa de uma loja. Sem cartão. */
+export type FormaDeposito = 'pix' | 'loja';
+
+/** Regras do Cofrinho Contente (GET /api/app/cofrinho, contrato 39.1). */
+export type RegrasCofrinho = {
+  regras: {
+    prazoDias: number;
+    entradaMinimaPercentual: number;
+    depositoMinimo: number;
+    precoMinimo: number;
+    maxAbertos: number;
+    avisosDias: number[];
+    formas: FormaDeposito[];
+    nomesFormas: Record<FormaDeposito, string>;
+  };
+  termos: { versao: string; atualizadoEm: string };
+};
+
+/** Termos do Cofrinho Contente (GET /api/app/cofrinho/termos), o mesmo texto da página /cofrinho/termos do site. */
+export type TermosCofrinho = { versao: string; atualizadoEm: string; titulo: string; secoes: { titulo: string; paragrafos: string[] }[] };
+
+/** Simulação do cofrinho para um produto (GET /api/app/cofrinho/simulacao). */
+export type SimulacaoCofrinho = {
+  produto: CardProduto;
+  elegivel: { pode: true; motivo?: undefined } | { pode: false; motivo: string };
+  precoGarantido: number;
+  garantidoAte: string;
+  prazoDias: number;
+  entradaMinima: number;
+  sugestoes: { tipo: 'mensal' | 'quinzenal' | 'semanal'; vezes: number; valor: number; texto: string }[];
+};

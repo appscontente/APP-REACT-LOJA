@@ -12,6 +12,7 @@ import { BotaoFigital } from '@/componentes/botao-figital';
 import { Aviso } from '@/componentes/estado-tela';
 import { ProvedorBoasVindas } from '@/estado/boas-vindas';
 import { ProvedorCarrinho } from '@/estado/carrinho';
+import { ProvedorCofrinho } from '@/estado/cofrinho';
 import { ProvedorConta } from '@/estado/conta';
 import { ProvedorConversas } from '@/estado/conversas';
 import { ProvedorFigital } from '@/estado/figital';
@@ -72,6 +73,7 @@ export default function Raiz() {
               <ProvedorBoasVindas>
                 <ProvedorCarrinho>
                   <ProvedorConversas>
+                    <ProvedorCofrinho>
                     <View style={{ flex: 1 }}>
                       {/* Texto escuro na barra de status; o Início (topo vermelho), o leitor e o pedido recebido trocam para claro. */}
                       <StatusBar style="dark" />
@@ -92,9 +94,15 @@ export default function Raiz() {
                         <Stack.Screen name="checkout" options={{ title: 'Finalizar compra' }} />
                         <Stack.Screen name="pedido-recebido" options={{ headerShown: false, gestureEnabled: false }} />
                         <Stack.Screen name="[segmento]/p" options={{ title: '' }} />
+                        <Stack.Screen name="cofrinho/index" options={{ title: 'Cofrinho Contente' }} />
+                        <Stack.Screen name="cofrinho/novo" options={{ title: 'Novo cofrinho' }} />
+                        <Stack.Screen name="cofrinho/termos" options={{ title: 'Termos do cofrinho' }} />
+                        <Stack.Screen name="cofrinho/[id]/depositar" options={{ title: 'Depositar' }} />
+                        <Stack.Screen name="cofrinho/[id]/trocar" options={{ title: 'Trocar produto' }} />
                       </Stack>
                       <BotaoFigital />
                     </View>
+                    </ProvedorCofrinho>
                   </ProvedorConversas>
                 </ProvedorCarrinho>
               </ProvedorBoasVindas>

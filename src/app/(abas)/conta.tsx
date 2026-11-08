@@ -11,6 +11,7 @@ import { Botao } from '@/componentes/botao';
 import { Sorriso } from '@/componentes/logo';
 import { Texto } from '@/componentes/texto';
 import { useBoasVindas } from '@/estado/boas-vindas';
+import { useCofrinho } from '@/estado/cofrinho';
 import { useConta, useSairDaConta } from '@/estado/conta';
 import { useConversas } from '@/estado/conversas';
 import { temSegundoPlano } from '@/lib/perto-da-loja';
@@ -170,10 +171,11 @@ export default function Conta() {
   const { logado, email, pedidos, favoritos } = useConta();
   const sair = useSairDaConta();
   const { naoLidas } = useConversas();
+  const { abertos } = useCofrinho();
   const confirmarSaida = () =>
     Alert.alert(
       'Sair da conta?',
-      'Saem deste celular seus pedidos, favoritos, CEP, conversas com a loja e buscas recentes. O carrinho continua.',
+      'Saem deste celular seus pedidos, favoritos, CEP, conversas com a loja, cofrinhos e buscas recentes. O carrinho continua.',
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Sair', style: 'destructive', onPress: sair },
@@ -192,6 +194,7 @@ export default function Conta() {
         <Opcao icone="chatbubbles-outline" titulo="Conversas com a loja" texto="Tire dúvidas com um vendedor" contador={naoLidas} aoTocar={() => router.push('/conversas')} />
         {/* Saldo e nível vêm do Happy pela sessão do site: até o app ter a dele, abre a Minha conta do site (aba Crédito). */}
         <Opcao icone="wallet-outline" titulo="Cashback e nível" texto="Saldo, o que vence e o seu nível" aoTocar={() => router.push('/minha-conta/credito' as never)} />
+        <Opcao icone="wallet" titulo="Cofrinho Contente" texto="Garanta o preço e junte aos poucos" contador={abertos.length} aoTocar={() => router.push('/cofrinho')} />
         <Opcao icone="heart-outline" titulo="Favoritos" texto="Os produtos que você salvou" contador={favoritos.length} aoTocar={() => router.push('/favoritos')} />
         <Opcao icone="cube-outline" titulo="Acompanhar entrega" aoTocar={() => router.push('/rastreio')} />
       </View>

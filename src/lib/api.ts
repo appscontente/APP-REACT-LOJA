@@ -20,8 +20,11 @@ import type {
   Produto,
   ProdutoFigital,
   RastreioApp,
+  RegrasCofrinho,
   ResultadoBusca,
   ResultadoCalculo,
+  SimulacaoCofrinho,
+  TermosCofrinho,
 } from './tipos';
 
 export const SITE_URL = (process.env.EXPO_PUBLIC_SITE_URL ?? 'https://loja-casacontente.onrender.com').replace(/\/$/, '');
@@ -147,6 +150,12 @@ export const api = {
     obter<PreviaCashback>('/api/app/cashback/previa', {
       itens: itens.map((i) => `${i.codprod}:${Math.round(i.total * 100) / 100}`).join(','),
     }),
+  /** Cofrinho Contente: regras e versão dos termos (contrato 39.1). */
+  regrasCofrinho: () => obter<RegrasCofrinho>('/api/app/cofrinho'),
+  /** Termos e condições do Cofrinho Contente, o mesmo texto da página /cofrinho/termos do site. */
+  termosCofrinho: () => obter<TermosCofrinho>('/api/app/cofrinho/termos'),
+  /** Preço à vista garantido, entrada mínima e sugestões de depósito de um produto. Só simula: o preço vale na abertura. */
+  simularCofrinho: (por: { slug?: string; codprod?: string }) => obter<SimulacaoCofrinho>('/api/app/cofrinho/simulacao', por),
   descontos: (loja: string, codprods: string[]) =>
     obter<{ itens: DescontoFigital[] }>(`/api/app/lojas/${encodeURIComponent(loja)}/descontos`, { itens: codprods.join(',') }),
 };
