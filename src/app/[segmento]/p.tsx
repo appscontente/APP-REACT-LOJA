@@ -10,6 +10,7 @@ import { AbasProduto } from '@/componentes/abas-produto';
 import { AbrirNoSite } from '@/componentes/abrir-no-site';
 import { AvisoCarrinho, BarraCompra } from '@/componentes/barra-compra';
 import { Botao } from '@/componentes/botao';
+import { CashbackDoProduto } from '@/componentes/cashback';
 import { Carregando, Erro } from '@/componentes/estado-tela';
 import { FreteCep } from '@/componentes/frete-cep';
 import { Galeria } from '@/componentes/galeria';
@@ -150,7 +151,10 @@ export default function PaginaProduto() {
               Vendido só no conjunto
             </Texto>
           ) : p.estoque > 0 ? (
-            <Preco preco={p.preco} precoDe={p.precoDe} descontoPix={p.descontoPix} pagamento={pagamento} tamanho="pagina" />
+            <>
+              <Preco preco={p.preco} precoDe={p.precoDe} descontoPix={p.descontoPix} pagamento={pagamento} tamanho="pagina" />
+              <CashbackDoProduto codprod={p.codprod} preco={p.preco} />
+            </>
           ) : (
             <Texto variante="subtitulo" cor={cores.textoSuave}>
               Esgotado no momento

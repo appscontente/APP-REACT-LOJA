@@ -190,6 +190,8 @@ export default function Conta() {
       <View style={estilos.grupo}>
         <Opcao icone="receipt-outline" titulo="Meus pedidos" texto="Do app e do site" contador={pedidos.length} aoTocar={() => router.push('/minha-conta/pedidos')} />
         <Opcao icone="chatbubbles-outline" titulo="Conversas com a loja" texto="Tire dúvidas com um vendedor" contador={naoLidas} aoTocar={() => router.push('/conversas')} />
+        {/* Saldo e nível vêm do Happy pela sessão do site: até o app ter a dele, abre a Minha conta do site (aba Crédito). */}
+        <Opcao icone="wallet-outline" titulo="Cashback e nível" texto="Saldo, o que vence e o seu nível" aoTocar={() => router.push('/minha-conta/credito' as never)} />
         <Opcao icone="heart-outline" titulo="Favoritos" texto="Os produtos que você salvou" contador={favoritos.length} aoTocar={() => router.push('/favoritos')} />
         <Opcao icone="cube-outline" titulo="Acompanhar entrega" aoTocar={() => router.push('/rastreio')} />
       </View>
