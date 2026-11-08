@@ -11,6 +11,7 @@ import { AbrirNoSite } from '@/componentes/abrir-no-site';
 import { AvisoCarrinho, BarraCompra } from '@/componentes/barra-compra';
 import { Botao } from '@/componentes/botao';
 import { CashbackDoProduto } from '@/componentes/cashback';
+import { ChamadaCofrinho } from '@/componentes/cofrinho';
 import { Carregando, Erro } from '@/componentes/estado-tela';
 import { FreteCep } from '@/componentes/frete-cep';
 import { Galeria } from '@/componentes/galeria';
@@ -172,6 +173,7 @@ export default function PaginaProduto() {
               Últimas unidades
             </Texto>
           ) : null}
+          <ChamadaCofrinho slug={p.slug} preco={p.preco} descontoPix={p.descontoPix} estoque={p.estoque} sujeitoConfirmacao={p.sujeitoConfirmacao} soConjunto={soConjunto} />
           {soConjunto ? null : <FreteCep valor={p.preco} />}
           <AbasProduto produto={p} />
         </View>

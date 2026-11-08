@@ -32,6 +32,7 @@ Sankhya → sync → Postgres → backend (FastAPI) → site (Next.js, rotas /ap
 | Boas-vindas na loja: 2 minutos perto de uma loja, o app dá as boas-vindas e entra no modo dela (liga na Conta) | Com o app aberto funciona até no Expo Go; com o app fechado (aviso no celular) só no app instalado pelo EAS |
 | Leitor de QR e código de barras (câmera) | Funciona; etiqueta `/qr/{CODEMP}/{CODPROD}` abre o produto na loja |
 | Conversa com a loja (no lugar do WhatsApp) | Demonstração no celular, com resposta automática; falta a rota no backend |
+| Cofrinho Contente (`/cofrinho`): garantir o preço à vista de um produto por 90 dias, aceite dos termos em todo cofrinho novo, depósitos no Pix, débito ou crédito à vista, troca de produto, desistência nos 7 dias | Regras, termos e preço reais do site (`/api/app/cofrinho*`, contrato seção 39); o cofrinho e os depósitos são demonstração, só no celular, nada é cobrado |
 | Carrinho, checkout (Pix ou cartão), pedidos, favoritos, entrar com código no e-mail | Demonstração: fica só no celular, nada é cobrado e o cartão nunca é guardado |
 
 Com as rotas do backend prontas (lista na seção 38 do contrato), só a camada `src/lib/api.ts` e os arquivos de

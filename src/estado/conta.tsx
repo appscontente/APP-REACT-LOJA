@@ -7,6 +7,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { apagar, gravar, ler } from '@/lib/armazenamento';
 import { cores } from '@/lib/tema';
 import type { ItemCarrinho } from './carrinho';
+import { useCofrinho } from './cofrinho';
 import { useConversas } from './conversas';
 
 export type PedidoApp = {
@@ -119,13 +120,18 @@ export function ProvedorConta({ children }: { children: ReactNode }) {
   return <ContextoConta.Provider value={valor}>{children}</ContextoConta.Provider>;
 }
 
-/** Sair da conta apagando também as conversas deste celular. Usado em "Sair da conta" e depois de excluir a conta. */
+/**
+ * Sair da conta apagando também as conversas e os cofrinhos deste celular. Usado em "Sair da conta" e depois de excluir
+ * a conta. Com o backend, os cofrinhos continuam na conta (Happy) e voltam ao entrar de novo.
+ */
 export function useSairDaConta() {
   const { sair } = useConta();
   const { limpar } = useConversas();
+  const { limpar: limparCofrinhos } = useCofrinho();
   return () => {
     sair();
     limpar();
+    limparCofrinhos();
   };
 }
 

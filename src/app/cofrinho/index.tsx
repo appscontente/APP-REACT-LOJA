@@ -1,0 +1,81 @@
+// Cofrinho Contente (mesmo endereço da página do site, /cofrinho): como funciona e os cofrinhos do cliente. O site só
+// apresenta; abrir e depositar é aqui no app.
+
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { ScrollView, StyleSheet, View } from 'react-native';
+
+import { Botao } from '@/componentes/botao';
+import { CartaoCofrinho } from '@/componentes/cofrinho';
+import { Texto } from '@/componentes/texto';
+import { useCofrinho } from '@/estado/cofrinho';
+import { api } from '@/lib/api';
+import { formatarPreco } from '@/lib/formatar';
+import { cores, raio } from '@/lib/tema';
+import { useDados } from '@/lib/use-dados';
+
+export default function TelaCofrinhos() {
+  const { cofrinhos, abertos } = useCofrinho();
+  const { dados } = useDados(() => api.regrasCofrinho(), []);
+  const r = dados?.regras;
+  const encerrados = cofrinhos.filter((c) => c.situacao !== 'aberto');
+  const passos = [
+    { icone: 'search' as const, texto: 'Abra um produto e toque em "Guardar no Cofrinho Contente".' },
+    { icone: 'lock-closed' as const, texto: `O preço à vista do dia fica garantido por ${r ? r.prazoDias : 90} dias.` },
+    {
+      icone: 'add-circle' as const,
+      texto: `Deposite quanto e quando quiser${r ? `, a partir de ${formatarPreco(r.depositoMinimo)}` : ''}, no Pix, débito ou crédito à vista.`,
+    },
+    { icone: 'home' as const, texto: 'Completou? Escolha entregar em casa ou retirar numa loja.' },
+  ];
+  return (
+    <ScrollView contentContainerStyle={estilos.conteudo}>
+      <View style={estilos.topo}>
+        <Ionicons name="wallet" size={36} color={cores.texto} />
+        <Texto variante="titulo">Cofrinho Contente</Texto>
+        <Texto>Garanta o preço à vista de um produto e junte de pouquinho em pouquinho.</Texto>
+      </View>
+
+      {abertos.length ? (
+        <View style={{ gap: 10 }}>
+          <Texto variante="secao">Seus cofrinhos</Texto>
+          {abertos.map((c) => (
+            <CartaoCofrinho key={c.id} cofrinho={c} />
+          ))}
+        </View>
+      ) : null}
+
+      <View style={estilos.caixa}>
+        <Texto variante="subtitulo">Como funciona</Texto>
+        {passos.map((p) => (
+          <View key={p.texto} style={estilos.passo}>
+            <Ionicons name={p.icone} size={20} color={cores.marca} />
+            <Texto style={{ flex: 1 }}>{p.texto}</Texto>
+          </View>
+        ))}
+        <Texto variante="pequeno" cor={cores.textoSuave}>
+          O saldo fica guardado para o seu cofrinho: não volta em dinheiro (só nos primeiros {r?.arrependimentoDias ?? 7} dias) e não paga outras compras,
+          mas você pode trocar o produto quando quiser. Itens do cofrinho não ganham nem usam cashback.
+        </Texto>
+        <Botao titulo="Escolher um produto" onPress={() => router.push('/busca')} />
+        <Botao titulo="Termos e condições" variante="texto" onPress={() => router.push('/cofrinho/termos')} />
+      </View>
+
+      {encerrados.length ? (
+        <View style={{ gap: 10 }}>
+          <Texto variante="secao">Concluídos e cancelados</Texto>
+          {encerrados.map((c) => (
+            <CartaoCofrinho key={c.id} cofrinho={c} />
+          ))}
+        </View>
+      ) : null}
+    </ScrollView>
+  );
+}
+
+const estilos = StyleSheet.create({
+  conteudo: { padding: 16, gap: 20, paddingBottom: 120 },
+  topo: { gap: 8, padding: 20, borderRadius: raio.xl, backgroundColor: cores.sorriso },
+  caixa: { gap: 12, padding: 16, borderRadius: raio.l, backgroundColor: cores.superficie, borderWidth: 1, borderColor: cores.borda },
+  passo: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+});
