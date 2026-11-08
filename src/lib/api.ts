@@ -16,6 +16,7 @@ import type {
   LojaFisica,
   OrcamentoApp,
   Pagamento,
+  PreviaCashback,
   Produto,
   ProdutoFigital,
   RastreioApp,
@@ -138,6 +139,14 @@ export const api = {
     obter<ProdutoFigital>(`/api/app/lojas/${encodeURIComponent(loja)}/produtos`, por),
   expostos: (loja: string) => obter<Exposto[]>(`/api/app/lojas/${encodeURIComponent(loja)}/expostos`),
   /** Desconto do autoatendimento (Happy) de cada item em cada forma de pagamento; sem resposta, sem desconto. */
+  /**
+   * Cashback do Happy de cada item (codprod e valor pago depois das promoções). Sem a sessão do cliente no app, o % vem
+   * sem nível. Sem resposta, `{}`: o app não mostra cashback.
+   */
+  previaCashback: (itens: { codprod: string; total: number }[]) =>
+    obter<PreviaCashback>('/api/app/cashback/previa', {
+      itens: itens.map((i) => `${i.codprod}:${Math.round(i.total * 100) / 100}`).join(','),
+    }),
   descontos: (loja: string, codprods: string[]) =>
     obter<{ itens: DescontoFigital[] }>(`/api/app/lojas/${encodeURIComponent(loja)}/descontos`, { itens: codprods.join(',') }),
 };

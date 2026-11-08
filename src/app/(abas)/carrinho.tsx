@@ -5,6 +5,7 @@ import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, View } from 'reac
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Botao } from '@/componentes/botao';
+import { CashbackDoItem, CashbackDoPedido } from '@/componentes/cashback';
 import { Cupom } from '@/componentes/cupom';
 import { Aviso } from '@/componentes/estado-tela';
 import { ItemCarrinho } from '@/componentes/item-carrinho';
@@ -17,6 +18,7 @@ import { DESCONTO_PIX, arredondar, formatarPreco, nomeLegivel } from '@/lib/form
 import { rotaCarrinhoLoja } from '@/lib/rotas';
 import { cores, raio } from '@/lib/tema';
 import { useCalculoCarrinho, useCupom } from '@/lib/use-calculo-carrinho';
+import { usePreviaCashback } from '@/lib/use-cashback';
 
 type Linha = [string, string, string?];
 
@@ -59,6 +61,13 @@ export default function Carrinho() {
     lista,
     { cupom: cupom || undefined, cliente: conta.logado ? conta.email : undefined },
     conferencia !== undefined && cupomPronto,
+  );
+
+  // Cashback do Happy de cada item, sobre o valor depois das promoções (sem o cálculo do site, o preço da vitrine).
+  const previaCashback = usePreviaCashback(
+    lista
+      .filter((i) => !i.indisponivel)
+      .map((i) => ({ codprod: i.codprod, total: resultado?.itens.find((r) => r.codprod === i.codprod)?.total ?? i.preco * i.quantidade })),
   );
 
   // Totais: os do site quando o cálculo chegou; antes dele (ou sem resposta), os locais da vitrine.
@@ -139,13 +148,14 @@ export default function Carrinho() {
               </View>
             ) : null}
             {lista.map((i) => (
-              <ItemCarrinho key={i.codprod} item={i} />
+              <ItemCarrinho key={i.codprod} item={i} extra={<CashbackDoItem previa={previaCashback} codprod={i.codprod} />} />
             ))}
             <View style={estilos.caixa}>
               <Cupom cupom={cupom} resultado={resultado?.cupom} carregando={carregando} aoAplicar={definirCupom} aoTirar={limparCupom} />
             </View>
             <View style={estilos.caixa}>
               <Resumo linhas={linhas} total={totalProdutos} rodape={rodape} />
+              <CashbackDoPedido previa={previaCashback} ate />
               {temIndisponivel ? (
                 <Texto variante="pequeno" cor={cores.marca} style={{ textAlign: 'center' }}>
                   Tire do carrinho os itens indisponíveis para continuar.

@@ -220,6 +220,16 @@ export type ResultadoCalculo = {
   cupom?: { codigo: string; valido: boolean; mensagem: string; afiliado?: string };
 };
 
+// Cashback do Happy (GET /api/app/cashback/previa, contrato 30.2 e 38.1) ------------------------------------------
+
+/** Prévia do cashback: % (2 = 2%) e valor de cada item, o total e os prazos. Vazio = o app não promete cashback. */
+export type PreviaCashback = {
+  itens?: Record<string, { percentual: number; valor: number }>;
+  total?: number;
+  /** "liberado 7 dias depois da entrega, válido por 1 ano", pela regra de ganho do Happy. */
+  prazos?: string;
+};
+
 // Orçamento do vendedor (GET /api/app/orcamentos/{token}) ----------------------------------------------------------
 
 export type ItemOrcamento = {

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Pressable, StyleSheet, View } from 'react-native';
 
 import { useCarrinho, type Destino, type ItemCarrinho as Item } from '@/estado/carrinho';
@@ -12,7 +12,16 @@ import { Botao } from './botao';
 import { Imagem } from './imagem';
 import { Texto } from './texto';
 
-export function ItemCarrinho({ item, destino = 'site' }: { item: Item; destino?: Destino }) {
+export function ItemCarrinho({
+  item,
+  destino = 'site',
+  extra,
+}: {
+  item: Item;
+  destino?: Destino;
+  /** Linha a mais embaixo do nome (ex.: o cashback do item no carrinho do site). */
+  extra?: ReactNode;
+}) {
   const { alterar, remover } = useCarrinho();
   // Tirar do carrinho pede confirmação (no "−" com 1 unidade e na lixeira), para um toque sem querer não apagar o item.
   const [confirmando, setConfirmando] = useState(false);
@@ -53,6 +62,7 @@ export function ItemCarrinho({ item, destino = 'site' }: { item: Item; destino?:
             {resumoPecas(conjunto.escolhas.map((e) => ({ nome: nomeLegivel(e.nome), quantidade: e.quantidade })))}
           </Texto>
         ) : null}
+        {!item.indisponivel ? extra : null}
         {item.sujeitoConfirmacao && !item.indisponivel ? (
           <Texto variante="pequeno" cor={cores.aviso}>
             Peça de exposição: a loja confirma antes da cobrança

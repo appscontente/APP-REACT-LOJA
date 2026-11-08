@@ -26,6 +26,7 @@ import { Campo } from '@/componentes/campo';
 import { Cupom } from '@/componentes/cupom';
 import { Aviso } from '@/componentes/estado-tela';
 import { Resumo } from '@/componentes/resumo';
+import { CashbackDoPedido } from '@/componentes/cashback';
 import { Texto } from '@/componentes/texto';
 import { descontoPixConjuntos, disponiveis, totais, useCarrinho } from '@/estado/carrinho';
 import { useConta, type PedidoApp } from '@/estado/conta';
@@ -50,6 +51,7 @@ import { dividir, escreverValor, lerValor, sugerirCartao } from '@/lib/pagamento
 import { cores, fontes, raio } from '@/lib/tema';
 import type { PagamentoFigital, ResultadoCalculo } from '@/lib/tipos';
 import { useCalculoCarrinho, useCupom } from '@/lib/use-calculo-carrinho';
+import { usePreviaCashback } from '@/lib/use-cashback';
 import { useDados } from '@/lib/use-dados';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -232,6 +234,17 @@ export default function Checkout() {
   );
   /** Produtos depois das promoções do site; o subtotal da vitrine sem resultado (ou na loja). */
   const produtos = resultado?.totalProdutos ?? subtotal;
+  // Cashback do Happy (contrato 30.2): o % de cada item sobre o que o cliente paga nele, depois das promoções e, no
+  // Pix, do desconto do Pix. Só no carrinho do site: o pedido do carrinho da loja segue a tabela do autoatendimento.
+  const fatorPagamento = forma === 'pix' ? 1 - (resultado?.taxaPix ?? (subtotal > 0 ? (subtotal - pix) / subtotal : 0)) : 1;
+  const previaCashback = usePreviaCashback(
+    daLoja
+      ? []
+      : lista.map((i) => ({
+          codprod: i.codprod,
+          total: (resultado?.itens.find((r) => r.codprod === i.codprod)?.total ?? i.preco * i.quantidade) * fatorPagamento,
+        })),
+  );
 
   // Carrinho da loja: tabela do Happy com o desconto do autoatendimento de cada item na coluna "site" (pagando pelo
   // app). Linhas de conjunto ficam fora da consulta: conjunto já tem desconto próprio, e a chave KIT-... não existe lá.
@@ -890,6 +903,7 @@ export default function Checkout() {
                 : `No cartão: ${parcelamento}`
           }
         />
+        <CashbackDoPedido previa={previaCashback} />
         {erroPagamento ? (
           <View style={estilos.erro} accessibilityRole="alert">
             <Ionicons name="alert-circle-outline" size={22} color={cores.marca} />
