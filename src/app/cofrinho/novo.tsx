@@ -110,7 +110,7 @@ export default function NovoCofrinho() {
             versaoTermos: termos.versao,
             deposito,
           });
-          router.replace({ pathname: '/cofrinho/[id]', params: { id, novo: '1' } });
+          router.replace({ pathname: '/cofrinho/[id]', params: { id, novo: '1', ...(deposito.forma === 'loja' && { caixa: '1' }) } });
         }}
       />
     </ScrollView>

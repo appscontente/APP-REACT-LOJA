@@ -1,4 +1,4 @@
-// Novo depósito num Cofrinho Contente: valor (até o que falta) e forma (Pix, débito ou crédito à vista).
+// Novo depósito num Cofrinho Contente: valor (até o que falta) e forma (Pix ou no caixa de uma loja).
 
 import { router, useLocalSearchParams } from 'expo-router';
 import { ScrollView, View } from 'react-native';
@@ -62,7 +62,9 @@ export default function DepositarCofrinho() {
         titulo="Depositar"
         aoDepositar={(deposito) => {
           depositar(c.id, deposito);
-          router.back();
+          // No caixa: volta ao cofrinho com o código aberto, para mostrar na loja.
+          if (deposito.forma === 'loja') router.dismissTo({ pathname: '/cofrinho/[id]', params: { id: c.id, caixa: '1' } });
+          else router.back();
         }}
       />
     </ScrollView>

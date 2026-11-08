@@ -4,27 +4,30 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 
 import { Botao } from '@/componentes/botao';
 import { Progresso, SituacaoGarantia } from '@/componentes/cofrinho';
+import { Campo } from '@/componentes/campo';
 import { Copiar } from '@/componentes/copiar';
 import { Aviso } from '@/componentes/estado-tela';
 import { Imagem } from '@/componentes/imagem';
 import { Texto } from '@/componentes/texto';
 import { contas, garantiaVencida, useCofrinho, type DepositoCofrinho } from '@/estado/cofrinho';
 import { api } from '@/lib/api';
-import { DIAS_SEMANA, formatarData } from '@/lib/cofrinho';
+import { DIAS_SEMANA, entradaMinima, formatarData, lerReais } from '@/lib/cofrinho';
 import { arredondar, formatarDataHora, formatarPreco, nomeLegivel } from '@/lib/formatar';
 import { cores, fontes, raio } from '@/lib/tema';
 import { useDados } from '@/lib/use-dados';
 
-const NOME_FORMA = { pix: 'Pix', debito: 'Débito', credito: 'Crédito à vista' } as const;
+const NOME_FORMA = { pix: 'Pix', loja: 'No caixa' } as const;
 
 export default function TelaCofrinho() {
-  const { id, novo } = useLocalSearchParams<{ id: string; novo?: string }>();
-  const { buscar, confirmarPix, concluir, gerarSemana, pararSemanal, pronto } = useCofrinho();
+  const { id, novo, caixa } = useLocalSearchParams<{ id: string; novo?: string; caixa?: string }>();
+  const { buscar, confirmarPagamento, registrarCaixa, concluir, gerarSemana, pararSemanal, pronto } = useCofrinho();
+  const { dados: regras } = useDados(() => api.regrasCofrinho(), []);
   const c = buscar(id);
   const vencida = c ? garantiaVencida(c) : false;
   // Chegou o dia do pagamento semanal: o Pix da semana aparece pronto ao abrir o cofrinho.
@@ -69,6 +72,7 @@ export default function TelaCofrinho() {
           <Ionicons name="checkmark-circle" size={22} color={cores.sucesso} />
           <Texto cor={cores.sucesso} style={{ flex: 1 }}>
             Cofrinho aberto! O preço está garantido até {formatarData(c.garantidoAte)}.
+            {c.depositos.length === 0 ? ' Ele começa a valer com o primeiro depósito no caixa.' : ''}
           </Texto>
         </View>
       ) : null}
@@ -104,8 +108,18 @@ export default function TelaCofrinho() {
       </View>
 
       {pixPendente.map((d) => (
-        <PixPendente key={d.id} deposito={d} cofrinho={c.id} aoConfirmar={() => confirmarPix(c.id, d.id)} />
+        <PixPendente key={d.id} deposito={d} cofrinho={c.id} aoConfirmar={() => confirmarPagamento(c.id, d.id)} />
       ))}
+      {aberto && falta > 0 ? (
+        <CodigoCaixa
+          key={caixa ?? 'fechado'}
+          cofrinho={c.id}
+          aberto={caixa === '1' || c.depositos.length === 0}
+          minimo={Math.min(falta, c.depositos.some((d) => d.situacao === 'aprovado') ? (regras?.regras.depositoMinimo ?? 20) : regras ? entradaMinima(alvo, regras.regras) : Math.max(20, Math.ceil(alvo / 10)))}
+          falta={arredondar(falta - conta.pendente)}
+          aoReceber={(v) => registrarCaixa(c.id, v)}
+        />
+      ) : null}
 
       {aberto && c.plano ? (
         <View style={estilos.plano}>
@@ -193,7 +207,47 @@ function PixPendente({ deposito, cofrinho, aoConfirmar }: { deposito: DepositoCo
   );
 }
 
+/**
+ * Pagar no caixa de uma loja: o cliente mostra o código do cofrinho (o próprio número, com QR) e diz quanto quer
+ * depositar; o caixa digita o valor e recebe no Happy (contrato 39.2). O app não pede valor. Demonstração: o campo de
+ * baixo faz o papel do caixa.
+ */
+function CodigoCaixa({ cofrinho, aberto: abertoInicial, minimo, falta, aoReceber }: { cofrinho: string; aberto: boolean; minimo: number; falta: number; aoReceber: (valor: number) => void }) {
+  const [aberto, setAberto] = useState(abertoInicial);
+  const [texto, setTexto] = useState('');
+  const valor = lerReais(texto);
+  const valido = Number.isFinite(valor) && valor >= minimo && valor <= falta;
+  if (!aberto)
+    return <Botao titulo="Pagar no caixa de uma loja" variante="contorno" onPress={() => setAberto(true)} />;
+  return (
+    <View style={estilos.pix}>
+      <Texto variante="forte">Pagar no caixa de uma loja</Texto>
+      <Texto variante="pequeno" cor={cores.textoSuave}>
+        Mostre este código no caixa de qualquer loja Casa Contente e diga quanto quer depositar (de {formatarPreco(minimo)} até {formatarPreco(falta)}). Você paga como a loja aceitar e o valor
+        entra no saldo na hora.
+      </Texto>
+      <View style={estilos.qr}>
+        <QRCode value={cofrinho} size={150} />
+        <Texto variante="titulo" selectable style={{ letterSpacing: 2 }}>
+          {cofrinho}
+        </Texto>
+      </View>
+      <Campo rotulo="Valor pago no caixa (demonstração)" value={texto} onChangeText={(t) => setTexto(t.replace(/[^\d,.]/g, ''))} keyboardType="decimal-pad" placeholder="0,00" />
+      <Botao
+        titulo="Registrar como o caixa (demonstração)"
+        variante="texto"
+        disabled={!valido}
+        onPress={() => {
+          aoReceber(Math.round(valor * 100) / 100);
+          setTexto('');
+        }}
+      />
+    </View>
+  );
+}
+
 const estilos = StyleSheet.create({
+  qr: { alignItems: 'center', gap: 10, padding: 16, borderRadius: raio.m, backgroundColor: cores.superficie },
   conteudo: { padding: 16, gap: 18, paddingBottom: 140 },
   sucesso: { flexDirection: 'row', gap: 8, padding: 12, borderRadius: raio.m, backgroundColor: cores.sucessoFundo, alignItems: 'center' },
   produto: { flexDirection: 'row', gap: 12, alignItems: 'center' },

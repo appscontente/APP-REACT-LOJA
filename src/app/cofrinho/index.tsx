@@ -27,7 +27,7 @@ export default function TelaCofrinhos() {
     },
     {
       icone: 'add-circle' as const,
-      texto: 'Sem parcela fixa: deixe um Pix toda semana, no dia que escolher, ou deposite outro valor quando quiser, no Pix, débito ou crédito à vista.',
+      texto: 'Sem parcela fixa: deixe um Pix toda semana, no dia que escolher, ou deposite outro valor quando quiser, no Pix ou no caixa de qualquer loja.',
     },
     { icone: 'home' as const, texto: 'Completou? Escolha entregar em casa ou retirar numa loja.' },
   ];

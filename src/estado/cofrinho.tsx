@@ -29,7 +29,7 @@ export type DepositoCofrinho = {
   forma: FormaDeposito;
   valor: number;
   quando: string;
-  /** Pix gerado e ainda não pago não conta no saldo. */
+  /** Pix gerado e ainda não pago não conta no saldo. No caixa, o depósito já nasce aprovado (o caixa recebeu). */
   situacao: 'aprovado' | 'aguardando-pix' | 'devolvido';
   /** Pix gerado pelo pagamento semanal (não pelo cliente na hora). */
   semanal?: boolean;
@@ -64,12 +64,11 @@ export type Cofrinho = {
   plano?: PlanoSemanal;
 };
 
-/** O que o formulário de depósito devolve: o depósito de agora e, se o cliente escolheu, o pagamento semanal. */
-export type NovoDeposito = {
-  forma: FormaDeposito;
-  valor: number;
-  semanal?: { valor: number; diaSemana: number };
-};
+/**
+ * O que o formulário de depósito devolve: o depósito de agora e, se o cliente escolheu, o pagamento semanal. No caixa
+ * (`forma: 'loja'`) não há valor: o cliente só mostra o código do cofrinho e o caixa digita quanto recebeu.
+ */
+export type NovoDeposito = { forma: 'pix'; valor: number; semanal?: { valor: number; diaSemana: number } } | { forma: 'loja' };
 
 /** Valor do cofrinho (soma dos preços garantidos), saldo aprovado e quanto falta. */
 export function contas(c: Cofrinho) {
@@ -95,12 +94,14 @@ type Contexto = {
   abertos: Cofrinho[];
   buscar: (id: string) => Cofrinho | undefined;
   abrir: (dados: { item: ItemCofrinho; garantidoAte: string; versaoTermos: string; deposito: NovoDeposito }) => string;
-  depositar: (id: string, deposito: NovoDeposito) => DepositoCofrinho;
+  depositar: (id: string, deposito: NovoDeposito) => void;
   /** Gera o Pix da semana quando chegou o dia do pagamento semanal (o app chama ao abrir o cofrinho). */
   gerarSemana: (id: string) => void;
   pararSemanal: (id: string) => void;
   /** Demonstração: o "banco" confirma o Pix. Com o backend, a confirmação vem da consulta à e.Rede. */
-  confirmarPix: (id: string, deposito: string) => void;
+  confirmarPagamento: (id: string, deposito: string) => void;
+  /** Demonstração: o caixa da loja recebe pelo código do cofrinho. Com o backend, quem registra é o caixa no Happy. */
+  registrarCaixa: (id: string, valor: number) => void;
   trocar: (id: string, itens: ItemCofrinho[], motivo: TrocaCofrinho['motivo'], garantidoAte: string) => void;
   concluir: (id: string) => void;
   limpar: () => void;
@@ -144,17 +145,19 @@ export function ProvedorCofrinho({ children }: { children: ReactNode }) {
       forma,
       valor: arredondar(valor),
       quando: agoraIso(),
-      // Cartão (demonstração): aprovado na hora. Com o backend, entra no saldo só depois da ClearSale e da captura.
+      // No caixa o depósito só nasce quando o caixa recebe: já aprovado.
       situacao: forma === 'pix' ? 'aguardando-pix' : 'aprovado',
       ...(semanal && { semanal }),
     });
     // O primeiro Pix do plano é o depósito de agora; o próximo sai no dia escolhido da semana seguinte.
     const plano = (d: NovoDeposito): PlanoSemanal | undefined =>
-      d.semanal && {
+      d.forma === 'pix' && d.semanal ? {
         valor: arredondar(d.semanal.valor),
         diaSemana: d.semanal.diaSemana,
         proximo: proximaSemana(d.semanal.diaSemana),
-      };
+      } : undefined;
+    // No caixa não nasce depósito no app: o caixa registra quando recebe.
+    const doFormulario = (d: NovoDeposito) => (d.forma === 'pix' ? [deposito('pix', d.valor, Boolean(d.semanal))] : []);
     const semanaNova = (c: Cofrinho): Cofrinho => {
       if (!c.plano) return c;
       const { falta, pendente } = contas(c);
@@ -173,7 +176,7 @@ export function ProvedorCofrinho({ children }: { children: ReactNode }) {
       };
     };
     const lembrar = (id: string, nome: string, d: NovoDeposito) => {
-      if (d.semanal) agendarLembreteSemanal(id, nome, d.semanal.valor, d.semanal.diaSemana);
+      if (d.forma === 'pix' && d.semanal) agendarLembreteSemanal(id, nome, d.semanal.valor, d.semanal.diaSemana);
     };
     return {
       cofrinhos,
@@ -190,11 +193,11 @@ export function ProvedorCofrinho({ children }: { children: ReactNode }) {
             abertoEm: em,
             garantidoAte,
             itens: [item],
-            depositos: [deposito(d.forma, d.valor, Boolean(d.semanal))],
+            depositos: doFormulario(d),
             trocas: [],
             aceite: { versao: versaoTermos, em },
             situacao: 'aberto',
-            ...(d.semanal && { plano: plano(d) }),
+            ...(plano(d) && { plano: plano(d) }),
           },
           ...lista,
         ]);
@@ -202,16 +205,16 @@ export function ProvedorCofrinho({ children }: { children: ReactNode }) {
         return id;
       },
       depositar: (id, d) => {
-        const novo = deposito(d.forma, d.valor, Boolean(d.semanal));
+        const novos = doFormulario(d);
         mudar(id, (c) => ({
           ...c,
-          depositos: [...c.depositos, novo],
-          ...(d.semanal && { plano: plano(d) }),
+          depositos: [...c.depositos, ...novos],
+          ...(plano(d) && { plano: plano(d) }),
         }));
         const c = cofrinhos.find((x) => x.id === id);
         if (c) lembrar(id, c.itens.map((i) => i.nome).join(', '), d);
-        return novo;
       },
+      registrarCaixa: (id, valor) => mudar(id, (c) => ({ ...c, depositos: [...c.depositos, deposito('loja', valor)] })),
       // Devolve a mesma lista quando não é dia de gerar: a tela chama a cada mudança e não pode entrar em laço.
       gerarSemana: (id) =>
         setCofrinhos((lista) => {
@@ -223,7 +226,7 @@ export function ProvedorCofrinho({ children }: { children: ReactNode }) {
         cancelarLembreteSemanal(id);
         mudar(id, ({ plano: _plano, ...c }) => c);
       },
-      confirmarPix: (id, dep) =>
+      confirmarPagamento: (id, dep) =>
         mudar(id, (c) => ({
           ...c,
           depositos: c.depositos.map((d) => (d.id === dep && d.situacao === 'aguardando-pix' ? { ...d, situacao: 'aprovado' } : d)),

@@ -342,8 +342,8 @@ export type AmbienteApp = {
 
 export type GrupoStories = { loja: { slug: string; nome: string }; stories: AmbienteApp[] };
 
-/** Forma de depósito do Cofrinho Contente (e.Rede). Crédito só à vista. */
-export type FormaDeposito = 'pix' | 'debito' | 'credito';
+/** Forma de depósito do Cofrinho Contente: Pix (e.Rede) ou no caixa de uma loja. Sem cartão. */
+export type FormaDeposito = 'pix' | 'loja';
 
 /** Regras do Cofrinho Contente (GET /api/app/cofrinho, contrato 39.1). */
 export type RegrasCofrinho = {
