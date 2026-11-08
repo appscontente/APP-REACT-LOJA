@@ -86,7 +86,7 @@ export function ChamadaCofrinho({ slug, preco, descontoPix, estoque, sujeitoConf
       style={({ pressed }) => [estilos.chamada, pressed && { opacity: 0.9 }]}
       accessibilityRole="button"
       accessibilityLabel={`Guardar no Cofrinho Contente: garanta ${formatarPreco(aVista)} por 3 meses e junte aos poucos`}>
-      <Porquinho largura={52} brilhos={false} />
+      <Porquinho largura={52} />
       <View style={{ flex: 1 }}>
         <Texto variante="forte">Guardar no Cofrinho Contente</Texto>
         <Texto variante="pequeno" cor={cores.textoSuave}>
