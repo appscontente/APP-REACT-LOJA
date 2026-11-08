@@ -57,6 +57,8 @@ export default function DepositarCofrinho() {
         preco={alvo}
         falta={falta}
         primeiro={false}
+        garantidoAte={c.garantidoAte}
+        planoAtual={c.plano}
         titulo="Depositar"
         aoDepositar={(deposito) => {
           depositar(c.id, deposito);

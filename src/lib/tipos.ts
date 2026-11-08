@@ -39,6 +39,8 @@ export type Produto = Omit<CardProduto, 'imagem'> & {
   videoYoutube?: string;
   lojasExposicao?: string[];
   vendeIndividualmente?: boolean;
+  /** Liberado para o Cofrinho Contente no admin do site (todos começam desligados). Só com true o botão aparece. */
+  cofrinho?: boolean;
 };
 
 export type Pagamento = {
@@ -351,7 +353,6 @@ export type RegrasCofrinho = {
     depositoMinimo: number;
     precoMinimo: number;
     maxAbertos: number;
-    arrependimentoDias: number;
     avisosDias: number[];
     formas: FormaDeposito[];
     nomesFormas: Record<FormaDeposito, string>;

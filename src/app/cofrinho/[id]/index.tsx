@@ -1,8 +1,10 @@
 // Um Cofrinho Contente: quanto já foi juntado, até quando o preço está garantido, os depósitos (com o Pix que falta
-// pagar) e as ações: depositar, trocar o produto, concluir quando completar e desistir nos primeiros 7 dias.
+// pagar), o pagamento semanal e as ações: depositar, trocar o produto e concluir quando completar. O saldo não volta em
+// dinheiro (termos, item 10).
 
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useEffect } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Botao } from '@/componentes/botao';
@@ -13,7 +15,7 @@ import { Imagem } from '@/componentes/imagem';
 import { Texto } from '@/componentes/texto';
 import { contas, garantiaVencida, useCofrinho, type DepositoCofrinho } from '@/estado/cofrinho';
 import { api } from '@/lib/api';
-import { dentroDoArrependimento, formatarData } from '@/lib/cofrinho';
+import { DIAS_SEMANA, formatarData } from '@/lib/cofrinho';
 import { arredondar, formatarDataHora, formatarPreco, nomeLegivel } from '@/lib/formatar';
 import { cores, fontes, raio } from '@/lib/tema';
 import { useDados } from '@/lib/use-dados';
@@ -22,10 +24,13 @@ const NOME_FORMA = { pix: 'Pix', debito: 'Débito', credito: 'Crédito à vista'
 
 export default function TelaCofrinho() {
   const { id, novo } = useLocalSearchParams<{ id: string; novo?: string }>();
-  const { buscar, confirmarPix, concluir, desistir, pronto } = useCofrinho();
+  const { buscar, confirmarPix, concluir, gerarSemana, pararSemanal, pronto } = useCofrinho();
   const c = buscar(id);
   const vencida = c ? garantiaVencida(c) : false;
-  const { dados: regras } = useDados(() => api.regrasCofrinho(), []);
+  // Chegou o dia do pagamento semanal: o Pix da semana aparece pronto ao abrir o cofrinho.
+  useEffect(() => {
+    if (pronto && id) gerarSemana(id);
+  }, [pronto, id, gerarSemana]);
   // Depois do prazo, o cofrinho vale o preço à vista do dia de cada produto (termos, item 8).
   const { dados: precosDoDia } = useDados(
     () => (c && vencida && c.situacao === 'aberto' ? Promise.all(c.itens.map((i) => api.simularCofrinho({ slug: i.slug }).then((s) => s.precoGarantido))) : Promise.resolve(undefined)),
@@ -40,7 +45,6 @@ export default function TelaCofrinho() {
   const falta = arredondar(Math.max(0, alvo - conta.saldo));
   const aberto = c.situacao === 'aberto';
   const pixPendente = c.depositos.filter((d) => d.situacao === 'aguardando-pix');
-  const podeDesistir = aberto && regras && dentroDoArrependimento(c.abertoEm, regras.regras) && conta.saldo + conta.pendente > 0;
 
   const confirmarConclusao = () =>
     Alert.alert(
@@ -51,15 +55,11 @@ export default function TelaCofrinho() {
         { text: 'Concluir', onPress: () => concluir(c.id) },
       ],
     );
-  const confirmarDesistencia = () =>
-    Alert.alert(
-      'Desistir e receber de volta?',
-      `Você está nos ${regras?.regras.arrependimentoDias ?? 7} dias de arrependimento: o cartão é estornado e o Pix volta para a conta de onde saiu. O cofrinho é encerrado.`,
-      [
-        { text: 'Manter o cofrinho', style: 'cancel' },
-        { text: 'Desistir', style: 'destructive', onPress: () => desistir(c.id) },
-      ],
-    );
+  const confirmarParada = () =>
+    Alert.alert('Parar o pagamento semanal?', 'O app deixa de gerar o Pix toda semana. O saldo continua no cofrinho e você deposita quando quiser.', [
+      { text: 'Manter', style: 'cancel' },
+      { text: 'Parar', style: 'destructive', onPress: () => pararSemanal(c.id) },
+    ]);
 
   return (
     <ScrollView contentContainerStyle={estilos.conteudo}>
@@ -107,6 +107,24 @@ export default function TelaCofrinho() {
         <PixPendente key={d.id} deposito={d} cofrinho={c.id} aoConfirmar={() => confirmarPix(c.id, d.id)} />
       ))}
 
+      {aberto && c.plano ? (
+        <View style={estilos.plano}>
+          <Ionicons name="repeat" size={22} color={cores.marca} />
+          <View style={{ flex: 1, gap: 2 }}>
+            <Texto variante="forte">
+              Toda {DIAS_SEMANA[c.plano.diaSemana]}: {formatarPreco(c.plano.valor)} no Pix
+            </Texto>
+            <Texto variante="pequeno" cor={cores.textoSuave}>
+              O app gera o Pix no dia e avisa você. Próximo: {formatarData(c.plano.proximo)}.
+            </Texto>
+            <View style={{ flexDirection: 'row', gap: 16 }}>
+              <Botao titulo="Mudar" variante="texto" onPress={() => router.push({ pathname: '/cofrinho/[id]/depositar', params: { id: c.id } })} />
+              <Botao titulo="Parar" variante="texto" onPress={confirmarParada} />
+            </View>
+          </View>
+        </View>
+      ) : null}
+
       {aberto ? (
         <View style={{ gap: 10 }}>
           {falta > 0 ? (
@@ -129,6 +147,7 @@ export default function TelaCofrinho() {
             <Texto style={{ fontFamily: fontes.textoForte }} cor={d.situacao === 'aprovado' ? cores.texto : cores.textoSuave}>
               {formatarPreco(d.valor)}
               {d.situacao === 'aguardando-pix' ? ' (a pagar)' : d.situacao === 'devolvido' ? ' (devolvido)' : ''}
+              {d.semanal ? ' · semanal' : ''}
             </Texto>
           </View>
         ))}
@@ -147,11 +166,10 @@ export default function TelaCofrinho() {
 
       <View style={estilos.regras}>
         <Texto variante="pequeno" cor={cores.textoSuave}>
-          O saldo é deste cofrinho: não paga outras compras e não ganha nem usa cashback. Aberto em {formatarDataHora(c.abertoEm)}, com os termos de{' '}
+          O saldo é deste cofrinho: não volta em dinheiro, não paga outras compras e não ganha nem usa cashback. Aberto em {formatarDataHora(c.abertoEm)}, com os termos de{' '}
           {c.aceite.versao.split('-').reverse().join('/')}.
         </Texto>
         <Botao titulo="Termos e condições" variante="texto" onPress={() => router.push('/cofrinho/termos')} />
-        {podeDesistir ? <Botao titulo="Desistir e receber de volta" variante="texto" onPress={confirmarDesistencia} /> : null}
       </View>
     </ScrollView>
   );
@@ -184,5 +202,6 @@ const estilos = StyleSheet.create({
   pix: { gap: 8, padding: 14, borderRadius: raio.l, backgroundColor: cores.avisoFundo },
   codigo: { padding: 10, borderRadius: raio.s, backgroundColor: cores.superficie },
   linha: { flexDirection: 'row', gap: 8, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: cores.borda },
+  plano: { flexDirection: 'row', gap: 12, padding: 14, borderRadius: raio.l, borderWidth: 1.5, borderColor: cores.sorriso, backgroundColor: cores.superficie },
   regras: { gap: 4, padding: 14, borderRadius: raio.l, backgroundColor: cores.fundoAlt },
 });

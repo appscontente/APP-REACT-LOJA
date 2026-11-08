@@ -29,9 +29,27 @@ export function conferirDeposito(valor: number, falta: number, primeiro: boolean
   return { valor: v };
 }
 
-/** Ainda dá para desistir com devolução de tudo (dias de arrependimento contados da abertura)? */
-export const dentroDoArrependimento = (abertoEm: string, r: Regras, agora = Date.now()) =>
-  agora - new Date(abertoEm).getTime() <= r.arrependimentoDias * DIA;
+/** Dias da semana do pagamento semanal (0 = domingo, como Date.getDay). */
+export const DIAS_SEMANA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'] as const;
+
+/**
+ * Valor por semana que completa o cofrinho até o fim da garantia (só uma sugestão: o cliente digita o que quiser). Nunca
+ * menos que o depósito mínimo nem mais que o que falta.
+ */
+export function valorSemanal(falta: number, garantidoAte: string, r: Regras, agora = Date.now()) {
+  if (falta <= 0) return 0;
+  const semanas = Math.max(1, Math.floor(diasAte(garantidoAte, agora) / 7) + 1);
+  return Math.min(arredondar(falta), Math.max(r.depositoMinimo, Math.ceil(falta / semanas)));
+}
+
+/** Próximo dia da semana escolhido, às 9h, depois de `agora` (o Pix de hoje já sai na hora em que o plano começa). */
+export function proximaSemana(diaSemana: number, agora = Date.now()) {
+  const d = new Date(agora);
+  d.setHours(9, 0, 0, 0);
+  const dias = (diaSemana - d.getDay() + 7) % 7 || 7;
+  d.setDate(d.getDate() + dias);
+  return d.toISOString();
+}
 
 /** Troca por escolha mantém o prazo; troca porque o produto esgotou recomeça a garantia. */
 export const garantiaDaTroca = (motivo: 'escolha' | 'esgotado', atual: string, r: Regras, agora = Date.now()) =>

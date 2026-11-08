@@ -6,6 +6,7 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Imagem } from '@/componentes/imagem';
+import { Porquinho } from '@/componentes/porquinho';
 import { Texto } from '@/componentes/texto';
 import { contas, garantiaVencida, type Cofrinho } from '@/estado/cofrinho';
 import { diasAte, formatarData } from '@/lib/cofrinho';
@@ -75,18 +76,17 @@ export function CartaoCofrinho({ cofrinho }: { cofrinho: Cofrinho }) {
  * Chamada na página do produto. Só aparece para produto que pode ir ao cofrinho pela conta local (estoque no CD,
  * vende sozinho, sem peça de exposição, preço à vista a partir do mínimo); a tela do cofrinho confere no site.
  */
-export function ChamadaCofrinho({ slug, preco, descontoPix, estoque, sujeitoConfirmacao, soConjunto }: { slug: string; preco: number; descontoPix?: number; estoque: number; sujeitoConfirmacao?: boolean; soConjunto: boolean }) {
+export function ChamadaCofrinho({ slug, preco, descontoPix, estoque, sujeitoConfirmacao, soConjunto, liberado }: { slug: string; preco: number; descontoPix?: number; estoque: number; sujeitoConfirmacao?: boolean; soConjunto: boolean; liberado?: boolean }) {
   const aVista = precoPix(preco, descontoPix);
-  if (soConjunto || !(estoque > 0) || sujeitoConfirmacao || aVista < PRECO_MINIMO_PADRAO) return null;
+  // Só produto que a equipe liberou no admin do site (todos começam desligados).
+  if (!liberado || soConjunto || !(estoque > 0) || sujeitoConfirmacao || aVista < PRECO_MINIMO_PADRAO) return null;
   return (
     <Pressable
       onPress={() => router.push({ pathname: '/cofrinho/novo', params: { slug } })}
       style={({ pressed }) => [estilos.chamada, pressed && { opacity: 0.9 }]}
       accessibilityRole="button"
       accessibilityLabel={`Guardar no Cofrinho Contente: garanta ${formatarPreco(aVista)} por 3 meses e junte aos poucos`}>
-      <View style={estilos.icone}>
-        <Ionicons name="wallet" size={22} color={cores.texto} />
-      </View>
+      <Porquinho largura={52} brilhos={false} />
       <View style={{ flex: 1 }}>
         <Texto variante="forte">Guardar no Cofrinho Contente</Texto>
         <Texto variante="pequeno" cor={cores.textoSuave}>
@@ -104,5 +104,4 @@ const estilos = StyleSheet.create({
   cartao: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: raio.l, backgroundColor: cores.superficie, borderWidth: 1, borderColor: cores.borda },
   foto: { width: 72, height: 72, borderRadius: raio.m, backgroundColor: cores.fundoAlt },
   chamada: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: raio.l, backgroundColor: cores.creme, borderWidth: 1, borderColor: cores.sorriso },
-  icone: { width: 40, height: 40, borderRadius: 20, backgroundColor: cores.sorriso, alignItems: 'center', justifyContent: 'center' },
 });

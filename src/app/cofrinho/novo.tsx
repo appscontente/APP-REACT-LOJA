@@ -75,13 +75,13 @@ export default function NovoCofrinho() {
       <View style={{ gap: 8 }}>
         <Texto variante="subtitulo">Sem parcela fixa</Texto>
         <Texto cor={cores.textoSuave}>
-          Abra com pelo menos {formatarPreco(sim.entradaMinima)} ({regras.entradaMinimaPercentual}% do preço). Depois, você decide: uma parcela, um pouco por dia ou por semana, como couber no seu bolso.
+          Abra com pelo menos {formatarPreco(sim.entradaMinima)} ({regras.entradaMinimaPercentual}% do preço). Depois, você decide: deixe um Pix toda semana, no dia que escolher, ou deposite outro valor quando quiser.
         </Texto>
       </View>
 
       <View style={estilos.regras}>
         <Linha icone="swap-horizontal" texto="Mudou de ideia? Troque por outro produto, sem perder o saldo." />
-        <Linha icone="lock-closed-outline" texto={`O saldo é deste cofrinho: não volta em dinheiro depois de ${regras.arrependimentoDias} dias e não paga outras compras.`} />
+        <Linha icone="lock-closed-outline" texto="O saldo é deste cofrinho: não volta em dinheiro e não paga outras compras." />
         <Linha icone="cube-outline" texto="O cofrinho não separa a peça: se ela esgotar, você espera a reposição ou troca." />
         <Linha icone="time-outline" texto={`Passou de ${sim.prazoDias} dias sem completar? O preço é recalculado pela tabela do dia, com o desconto à vista.`} />
         <Linha icone="pricetag-outline" texto="Frete e montagem são calculados no fim. Sem cupom e sem cashback." />
@@ -100,6 +100,7 @@ export default function NovoCofrinho() {
         falta={sim.precoGarantido}
         primeiro
         valorInicial={sim.entradaMinima}
+        garantidoAte={sim.garantidoAte}
         titulo="Abrir cofrinho e depositar"
         bloqueado={aceito ? undefined : 'Marque o aceite dos termos para abrir o cofrinho.'}
         aoDepositar={(deposito) => {

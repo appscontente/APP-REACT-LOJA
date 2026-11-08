@@ -1,4 +1,6 @@
-// Formulário de depósito do Cofrinho Contente: valor, forma (Pix, débito ou crédito à vista) e os dados do cartão. O
+// Formulário de depósito do Cofrinho Contente. Duas opções: "Toda semana" (o cliente digita o valor e escolhe o dia; o
+// primeiro Pix sai agora e o app gera os próximos e avisa) ou "Outro valor" (o cliente digita quanto quer depositar
+// agora e escolhe Pix, débito ou crédito à vista). O
 // cartão vai do formulário direto para o serviço de pagamento (contrato 3.12 e 39.2); o app nunca guarda número nem
 // CVV. Nesta demonstração nada é cobrado. Usado na abertura (primeiro depósito) e na tela "Depositar".
 
@@ -10,7 +12,8 @@ import { AppState, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Botao } from '@/componentes/botao';
 import { Campo } from '@/componentes/campo';
 import { Texto } from '@/componentes/texto';
-import { conferirDeposito, lerReais } from '@/lib/cofrinho';
+import type { NovoDeposito, PlanoSemanal } from '@/estado/cofrinho';
+import { conferirDeposito, DIAS_SEMANA, formatarData, lerReais, valorSemanal } from '@/lib/cofrinho';
 import { formatarPreco } from '@/lib/formatar';
 import { cores, raio } from '@/lib/tema';
 import type { FormaDeposito, RegrasCofrinho } from '@/lib/tipos';
@@ -28,7 +31,8 @@ export function DepositoCofrinho({
   falta,
   primeiro,
   valorInicial,
-  sugestoes = [],
+  garantidoAte,
+  planoAtual,
   titulo,
   bloqueado,
   aoDepositar,
@@ -40,17 +44,35 @@ export function DepositoCofrinho({
   falta: number;
   primeiro: boolean;
   valorInicial?: number;
-  /** Valores prontos para tocar (sugestões do site). */
-  sugestoes?: number[];
+  /** Fim da garantia do preço: com ela aparece a opção "Toda semana" (a sugestão completa até essa data). */
+  garantidoAte?: string;
+  /** Pagamento semanal que o cofrinho já tem (a opção abre com ele preenchido, para mudar). */
+  planoAtual?: PlanoSemanal;
   /** Texto do botão; o valor entra no fim. */
   titulo: string;
   /** Algo fora do formulário ainda falta (ex.: o aceite dos termos): o botão fica apagado com esta frase. */
   bloqueado?: string;
-  aoDepositar: (deposito: { forma: FormaDeposito; valor: number }) => void | Promise<void>;
+  aoDepositar: (deposito: NovoDeposito) => void | Promise<void>;
 }) {
-  const [texto, setTexto] = useState(valorInicial ? valorInicial.toFixed(2).replace('.', ',') : '');
-  const [forma, setForma] = useState<FormaDeposito>('pix');
-  const [cartao, setCartao] = useState({ numero: '', nome: '', validade: '', cvv: '' });
+  const reais = (v: number) => v.toFixed(2).replace('.', ',');
+  const [modo, setModo] = useState<'semanal' | 'outro'>(planoAtual ? 'semanal' : 'outro');
+  const [texto, setTexto] = useState(valorInicial ? reais(valorInicial) : '');
+  const [textoSemanal, setTextoSemanal] = useState(() => {
+    const v = planoAtual?.valor ?? (garantidoAte ? valorSemanal(falta, garantidoAte, regras) : 0);
+    return v > 0 ? reais(Math.max(v, primeiro ? (valorInicial ?? 0) : 0)) : '';
+  });
+  const [diaSemana, setDiaSemana] = useState(planoAtual?.diaSemana ?? new Date().getDay());
+  const [agora] = useState(() => Date.now());
+  const [formaEscolhida, setForma] = useState<FormaDeposito>('pix');
+  const semanal = modo === 'semanal' && Boolean(garantidoAte);
+  // O pagamento semanal é sempre no Pix: o cartão precisaria ficar guardado para a cobrança da semana.
+  const forma: FormaDeposito = semanal ? 'pix' : formaEscolhida;
+  const [cartao, setCartao] = useState({
+    numero: '',
+    nome: '',
+    validade: '',
+    cvv: '',
+  });
   const [tocouValor, setTocouValor] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [emPrimeiroPlano, setEmPrimeiroPlano] = useState(AppState.currentState === 'active');
@@ -70,7 +92,7 @@ export function DepositoCofrinho({
     return () => assinatura.remove();
   }, []);
 
-  const conferido = conferirDeposito(lerReais(texto), falta, primeiro, preco, regras);
+  const conferido = conferirDeposito(lerReais(semanal ? textoSemanal : texto), falta, primeiro, preco, regras);
   const valor = 'valor' in conferido ? conferido.valor : undefined;
   const faltaNoCartao = comCartao
     ? [
@@ -86,7 +108,7 @@ export function DepositoCofrinho({
     if (!pronto || valor === undefined) return;
     setEnviando(true);
     try {
-      await aoDepositar({ forma, valor });
+      await aoDepositar(semanal ? { forma: 'pix', valor, semanal: { valor, diaSemana } } : { forma, valor });
       // O cartão sai da memória da tela assim que o depósito vai.
       setCartao({ numero: '', nome: '', validade: '', cvv: '' });
     } finally {
@@ -94,57 +116,98 @@ export function DepositoCofrinho({
     }
   };
 
-  const opcoesValor = [...new Set([...sugestoes, falta].map((v) => Math.round(v * 100) / 100))].filter((v) => v > 0 && v <= falta).slice(0, 3);
+  // Com o valor digitado, em quantas semanas completa (só informa; o cliente muda quando quiser).
+  const semanas = semanal && valor ? Math.ceil(falta / valor) : 0;
+  const completaEm = semanas ? new Date(agora + (semanas - 1) * 7 * 86_400_000).toISOString() : undefined;
 
   return (
     <View style={{ gap: 12 }}>
-      <Campo
-        rotulo="Quanto você quer depositar (R$)"
-        value={texto}
-        onChangeText={(t) => setTexto(t.replace(/[^\d,.]/g, ''))}
-        onBlur={() => setTocouValor(true)}
-        keyboardType="decimal-pad"
-        placeholder="0,00"
-        erro={tocouValor && conferido.erro ? conferido.erro : undefined}
-      />
-      {opcoesValor.length ? (
-        <View style={estilos.chips}>
-          {opcoesValor.map((v) => (
-            <Pressable
-              key={v}
-              onPress={() => {
-                setTexto(v.toFixed(2).replace('.', ','));
-                setTocouValor(true);
-              }}
-              style={estilos.chip}
-              accessibilityRole="button"
-              accessibilityLabel={`Depositar ${formatarPreco(v)}`}>
-              <Texto variante="rotulo">{v === falta ? `Tudo: ${formatarPreco(v)}` : formatarPreco(v)}</Texto>
-            </Pressable>
-          ))}
+      {garantidoAte ? (
+        <View style={{ gap: 8 }} accessibilityRole="radiogroup">
+          <Opcao marcada={semanal} icone="repeat" titulo="Toda semana" texto="Você escolhe o valor e o dia. O app gera o Pix toda semana e avisa você." aoTocar={() => setModo('semanal')} />
+          <Opcao marcada={!semanal} icone="create-outline" titulo="Outro valor" texto="Digite quanto quer depositar agora, no Pix, débito ou crédito." aoTocar={() => setModo('outro')} />
         </View>
       ) : null}
 
-      <Texto variante="rotulo">Como você quer pagar</Texto>
-      <View style={{ gap: 8 }} accessibilityRole="radiogroup">
-        {regras.formas.map((f) => {
-          const marcado = forma === f;
-          return (
-            <Pressable
-              key={f}
-              onPress={() => setForma(f)}
-              style={[estilos.forma, marcado && estilos.formaMarcada]}
-              accessibilityRole="radio"
-              accessibilityState={{ checked: marcado }}>
-              <Ionicons name={ICONES[f]} size={22} color={marcado ? cores.marca : cores.textoSuave} />
-              <Texto variante="forte" style={{ flex: 1 }}>
-                {regras.nomesFormas[f]}
-              </Texto>
-              <Ionicons name={marcado ? 'radio-button-on' : 'radio-button-off'} size={20} color={marcado ? cores.marca : cores.textoSuave} />
-            </Pressable>
-          );
-        })}
-      </View>
+      {semanal ? (
+        <View style={{ gap: 12 }}>
+          <Campo
+            rotulo="Quanto por semana (R$)"
+            value={textoSemanal}
+            onChangeText={(t) => setTextoSemanal(t.replace(/[^\d,.]/g, ''))}
+            onBlur={() => setTocouValor(true)}
+            keyboardType="decimal-pad"
+            placeholder="0,00"
+            erro={tocouValor && conferido.erro ? conferido.erro : undefined}
+          />
+          <Texto variante="rotulo">Em que dia da semana</Texto>
+          <View style={estilos.chips}>
+            {DIAS_SEMANA.map((nome, i) => {
+              const marcado = diaSemana === i;
+              return (
+                <Pressable
+                  key={nome}
+                  onPress={() => setDiaSemana(i)}
+                  style={[estilos.dia, marcado && estilos.formaMarcada]}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: marcado }}
+                  accessibilityLabel={nome}>
+                  <Texto variante="rotulo" cor={marcado ? cores.marca : cores.texto}>
+                    {nome.slice(0, 3)}
+                  </Texto>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Texto variante="pequeno" cor={cores.textoSuave}>
+            O primeiro Pix sai agora. Depois, toda {DIAS_SEMANA[diaSemana]}, o app gera o Pix de {valor ? formatarPreco(valor) : 'cada semana'} e avisa você. O último é só o que faltar. Dá para mudar
+            ou parar quando quiser.
+            {completaEm ? ` Nesse ritmo, completa por volta de ${formatarData(completaEm)}.` : ''}
+          </Texto>
+        </View>
+      ) : (
+        <>
+          <Campo
+            rotulo="Quanto você quer depositar (R$)"
+            value={texto}
+            onChangeText={(t) => setTexto(t.replace(/[^\d,.]/g, ''))}
+            onBlur={() => setTocouValor(true)}
+            keyboardType="decimal-pad"
+            placeholder="0,00"
+            erro={tocouValor && conferido.erro ? conferido.erro : undefined}
+          />
+          {falta > 0 ? (
+            <View style={estilos.chips}>
+              <Pressable
+                onPress={() => {
+                  setTexto(reais(falta));
+                  setTocouValor(true);
+                }}
+                style={estilos.chip}
+                accessibilityRole="button"
+                accessibilityLabel={`Depositar tudo o que falta: ${formatarPreco(falta)}`}>
+                <Texto variante="rotulo">Tudo o que falta: {formatarPreco(falta)}</Texto>
+              </Pressable>
+            </View>
+          ) : null}
+
+          <Texto variante="rotulo">Como você quer pagar</Texto>
+          <View style={{ gap: 8 }} accessibilityRole="radiogroup">
+            {regras.formas.map((f) => {
+              const marcado = forma === f;
+              return (
+                <Pressable key={f} onPress={() => setForma(f)} style={[estilos.forma, marcado && estilos.formaMarcada]} accessibilityRole="radio" accessibilityState={{ checked: marcado }}>
+                  <Ionicons name={ICONES[f]} size={22} color={marcado ? cores.marca : cores.textoSuave} />
+                  <Texto variante="forte" style={{ flex: 1 }}>
+                    {regras.nomesFormas[f]}
+                  </Texto>
+                  <Ionicons name={marcado ? 'radio-button-on' : 'radio-button-off'} size={20} color={marcado ? cores.marca : cores.textoSuave} />
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
+      )}
 
       {comCartao ? (
         <View style={{ gap: 10 }}>
@@ -153,7 +216,12 @@ export function DepositoCofrinho({
               <Campo
                 rotulo="Número do cartão"
                 value={cartao.numero}
-                onChangeText={(t) => setCartao((c) => ({ ...c, numero: t.replace(/\D/g, '').slice(0, 19) }))}
+                onChangeText={(t) =>
+                  setCartao((c) => ({
+                    ...c,
+                    numero: t.replace(/\D/g, '').slice(0, 19),
+                  }))
+                }
                 keyboardType="number-pad"
                 autoComplete="cc-number"
               />
@@ -164,7 +232,10 @@ export function DepositoCofrinho({
                   value={cartao.validade}
                   onChangeText={(t) => {
                     const d = t.replace(/\D/g, '').slice(0, 4);
-                    setCartao((c) => ({ ...c, validade: d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d }));
+                    setCartao((c) => ({
+                      ...c,
+                      validade: d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d,
+                    }));
                   }}
                   keyboardType="number-pad"
                   autoComplete="cc-exp"
@@ -172,7 +243,12 @@ export function DepositoCofrinho({
                 <Campo
                   rotulo="CVV"
                   value={cartao.cvv}
-                  onChangeText={(t) => setCartao((c) => ({ ...c, cvv: t.replace(/\D/g, '').slice(0, 4) }))}
+                  onChangeText={(t) =>
+                    setCartao((c) => ({
+                      ...c,
+                      cvv: t.replace(/\D/g, '').slice(0, 4),
+                    }))
+                  }
                   keyboardType="number-pad"
                   secureTextEntry
                   autoComplete="cc-csc"
@@ -189,7 +265,7 @@ export function DepositoCofrinho({
             O app não guarda os dados do cartão.
           </Texto>
         </View>
-      ) : (
+      ) : semanal ? null : (
         <Texto variante="pequeno" cor={cores.textoSuave}>
           Geramos um código Pix copia e cola. O depósito entra no saldo assim que o banco confirmar.
         </Texto>
@@ -211,10 +287,70 @@ export function DepositoCofrinho({
   );
 }
 
+function Opcao({ marcada, icone, titulo, texto, aoTocar }: { marcada: boolean; icone: React.ComponentProps<typeof Ionicons>['name']; titulo: string; texto: string; aoTocar: () => void }) {
+  return (
+    <Pressable onPress={aoTocar} style={[estilos.opcao, marcada && estilos.formaMarcada]} accessibilityRole="radio" accessibilityState={{ checked: marcada }}>
+      <Ionicons name={icone} size={22} color={marcada ? cores.marca : cores.textoSuave} />
+      <View style={{ flex: 1, gap: 2 }}>
+        <Texto variante="forte">{titulo}</Texto>
+        <Texto variante="pequeno" cor={cores.textoSuave}>
+          {texto}
+        </Texto>
+      </View>
+      <Ionicons name={marcada ? 'radio-button-on' : 'radio-button-off'} size={20} color={marcada ? cores.marca : cores.textoSuave} />
+    </Pressable>
+  );
+}
+
 const estilos = StyleSheet.create({
+  opcao: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: raio.m,
+    borderWidth: 1.5,
+    borderColor: cores.borda,
+    backgroundColor: cores.superficie,
+  },
+  dia: {
+    minWidth: 44,
+    minHeight: 40,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: raio.pilula,
+    borderWidth: 1.5,
+    borderColor: cores.borda,
+    backgroundColor: cores.superficie,
+  },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 14, minHeight: 40, justifyContent: 'center', borderRadius: raio.pilula, borderWidth: 1.5, borderColor: cores.borda, backgroundColor: cores.superficie },
-  forma: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, paddingHorizontal: 14, borderRadius: raio.m, borderWidth: 1.5, borderColor: cores.borda, backgroundColor: cores.superficie },
+  chip: {
+    paddingHorizontal: 14,
+    minHeight: 40,
+    justifyContent: 'center',
+    borderRadius: raio.pilula,
+    borderWidth: 1.5,
+    borderColor: cores.borda,
+    backgroundColor: cores.superficie,
+  },
+  forma: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minHeight: 52,
+    paddingHorizontal: 14,
+    borderRadius: raio.m,
+    borderWidth: 1.5,
+    borderColor: cores.borda,
+    backgroundColor: cores.superficie,
+  },
   formaMarcada: { borderColor: cores.marca, backgroundColor: cores.creme },
-  aviso: { flexDirection: 'row', gap: 8, padding: 12, borderRadius: raio.m, backgroundColor: cores.avisoFundo },
+  aviso: {
+    flexDirection: 'row',
+    gap: 8,
+    padding: 12,
+    borderRadius: raio.m,
+    backgroundColor: cores.avisoFundo,
+  },
 });

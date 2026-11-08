@@ -7,6 +7,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { Botao } from '@/componentes/botao';
 import { CartaoCofrinho } from '@/componentes/cofrinho';
+import { Porquinho } from '@/componentes/porquinho';
 import { Texto } from '@/componentes/texto';
 import { useCofrinho } from '@/estado/cofrinho';
 import { api } from '@/lib/api';
@@ -26,16 +27,18 @@ export default function TelaCofrinhos() {
     },
     {
       icone: 'add-circle' as const,
-      texto: 'Sem parcela fixa: deposite uma parcela, um pouco por dia ou por semana, no Pix, débito ou crédito à vista.',
+      texto: 'Sem parcela fixa: deixe um Pix toda semana, no dia que escolher, ou deposite outro valor quando quiser, no Pix, débito ou crédito à vista.',
     },
     { icone: 'home' as const, texto: 'Completou? Escolha entregar em casa ou retirar numa loja.' },
   ];
   return (
     <ScrollView contentContainerStyle={estilos.conteudo}>
       <View style={estilos.topo}>
-        <Ionicons name="wallet" size={36} color={cores.texto} />
-        <Texto variante="titulo">Cofrinho Contente</Texto>
-        <Texto>Garanta o preço à vista de um produto e junte de pouquinho em pouquinho.</Texto>
+        <Porquinho largura={200} />
+        <Texto variante="titulo" cor="#fff">
+          Cofrinho Contente
+        </Texto>
+        <Texto cor="#fff">Garanta o preço à vista de um produto e junte de pouquinho em pouquinho.</Texto>
       </View>
 
       {abertos.length ? (
@@ -56,7 +59,7 @@ export default function TelaCofrinhos() {
           </View>
         ))}
         <Texto variante="pequeno" cor={cores.textoSuave}>
-          O saldo fica guardado para o seu cofrinho: não volta em dinheiro (só nos primeiros {r?.arrependimentoDias ?? 7} dias) e não paga outras compras,
+          O saldo fica guardado para o seu cofrinho: não volta em dinheiro e não paga outras compras,
           mas você pode trocar o produto quando quiser. Itens do cofrinho não ganham nem usam cashback.
         </Texto>
         <Botao titulo="Escolher um produto" onPress={() => router.push('/busca')} />
@@ -77,7 +80,7 @@ export default function TelaCofrinhos() {
 
 const estilos = StyleSheet.create({
   conteudo: { padding: 16, gap: 20, paddingBottom: 120 },
-  topo: { gap: 8, padding: 20, borderRadius: raio.xl, backgroundColor: cores.sorriso },
+  topo: { gap: 8, padding: 20, borderRadius: raio.xl, backgroundColor: cores.marca, alignItems: 'center' },
   caixa: { gap: 12, padding: 16, borderRadius: raio.l, backgroundColor: cores.superficie, borderWidth: 1, borderColor: cores.borda },
   passo: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
 });

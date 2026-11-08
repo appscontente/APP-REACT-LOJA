@@ -173,7 +173,7 @@ export default function PaginaProduto() {
               Últimas unidades
             </Texto>
           ) : null}
-          <ChamadaCofrinho slug={p.slug} preco={p.preco} descontoPix={p.descontoPix} estoque={p.estoque} sujeitoConfirmacao={p.sujeitoConfirmacao} soConjunto={soConjunto} />
+          <ChamadaCofrinho slug={p.slug} preco={p.preco} descontoPix={p.descontoPix} estoque={p.estoque} sujeitoConfirmacao={p.sujeitoConfirmacao} soConjunto={soConjunto} liberado={p.cofrinho === true} />
           {soConjunto ? null : <FreteCep valor={p.preco} />}
           <AbasProduto produto={p} />
         </View>
