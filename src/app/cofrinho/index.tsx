@@ -15,21 +15,22 @@ import { cores, raio } from '@/lib/tema';
 import { useDados } from '@/lib/use-dados';
 
 export default function TelaCofrinhos() {
-  const { cofrinhos, abertos } = useCofrinho();
+  const { cofrinhos, ativos } = useCofrinho();
   const { dados } = useDados(() => api.regrasCofrinho(), []);
   const r = dados?.regras;
-  const encerrados = cofrinhos.filter((c) => c.situacao !== 'aberto');
+  const encerrados = cofrinhos.filter((c) => !ativos.includes(c));
+  const abertura = dados?.abertura;
   const passos = [
-    { icone: 'search' as const, texto: 'Abra um produto e toque em "Guardar no Cofrinho Contente".' },
+    { icone: 'search' as const, texto: 'Abra um produto e toque em "Guardar no Cofrinho Contente". Antes de pagar, você vê o pedido completo, com frete e prazos.' },
     {
       icone: 'lock-closed' as const,
-      texto: `O preço à vista do dia fica garantido por ${r ? r.prazoDias : 90} dias: se a tabela subir, você ganha o desconto da diferença. Depois disso, o preço é recalculado pela tabela do dia, com o desconto à vista.`,
+      texto: 'O preço à vista do dia fica garantido e não sobe mais. Se o produto entrar em promoção, o seu cofrinho baixa junto.',
     },
     {
       icone: 'add-circle' as const,
-      texto: 'Sem parcela fixa: deixe um Pix toda semana, no dia que escolher, ou deposite outro valor quando quiser, no Pix ou no caixa de qualquer loja.',
+      texto: `Faça o primeiro pagamento em até ${r ? r.primeiroPagamentoHoras : 24} horas. Depois, guarde quanto e quando quiser, no Pix ou no caixa de qualquer loja. Sem parcela e sem cobrança.`,
     },
-    { icone: 'home' as const, texto: 'Completou? Escolha entregar em casa ou retirar numa loja.' },
+    { icone: 'home' as const, texto: 'Completou? O pedido sai com o frete e o prazo que você já combinou.' },
   ];
   return (
     <ScrollView contentContainerStyle={estilos.conteudo}>
@@ -38,13 +39,13 @@ export default function TelaCofrinhos() {
         <Texto variante="titulo" cor="#fff">
           Cofrinho Contente
         </Texto>
-        <Texto cor="#fff">Garanta o preço à vista de um produto e junte de pouquinho em pouquinho.</Texto>
+        <Texto cor="#fff">Garanta o preço à vista de um produto e junte de pouquinho em pouquinho, sem parcela e sem cobrança.</Texto>
       </View>
 
-      {abertos.length ? (
+      {ativos.length ? (
         <View style={{ gap: 10 }}>
           <Texto variante="secao">Seus cofrinhos</Texto>
-          {abertos.map((c) => (
+          {ativos.map((c) => (
             <CartaoCofrinho key={c.id} cofrinho={c} />
           ))}
         </View>
@@ -59,16 +60,22 @@ export default function TelaCofrinhos() {
           </View>
         ))}
         <Texto variante="pequeno" cor={cores.textoSuave}>
-          O saldo fica guardado para o seu cofrinho: não volta em dinheiro e não paga outras compras,
-          mas você pode trocar o produto quando quiser. Itens do cofrinho não ganham nem usam cashback.
+          Desistiu? Até {r ? r.arrependimentoDiasAposEntrega : 7} dias depois de receber o produto, devolvemos tudo, inclusive o frete. Não é poupança nem investimento: o que a gente garante é o
+          preço. Itens do cofrinho não ganham nem usam cashback.
         </Texto>
-        <Botao titulo="Escolher um produto" onPress={() => router.push('/busca')} />
-        <Botao titulo="Termos e condições" variante="texto" onPress={() => router.push('/cofrinho/termos')} />
+        {abertura && !abertura.ligada ? (
+          <Texto variante="forte" cor={cores.marca}>
+            {abertura.mensagem ?? 'O Cofrinho Contente abre em breve.'}
+          </Texto>
+        ) : (
+          <Botao titulo="Escolher um produto" onPress={() => router.push('/busca')} />
+        )}
+        <Botao titulo="Regulamento" variante="texto" onPress={() => router.push('/cofrinho/termos')} />
       </View>
 
       {encerrados.length ? (
         <View style={{ gap: 10 }}>
-          <Texto variante="secao">Concluídos e cancelados</Texto>
+          <Texto variante="secao">Encerrados</Texto>
           {encerrados.map((c) => (
             <CartaoCofrinho key={c.id} cofrinho={c} />
           ))}

@@ -1,4 +1,4 @@
-// Termos e condições do Cofrinho Contente (mesmo endereço e mesmo texto da página do site, /cofrinho/termos).
+// Regulamento e termo de adesão do Cofrinho Contente (mesmo endereço e mesmo texto da página do site, /cofrinho/termos).
 
 import { ScrollView, View } from 'react-native';
 
@@ -17,7 +17,7 @@ export default function TermosCofrinho() {
       <View style={{ gap: 4 }}>
         <Texto variante="titulo">{dados.titulo}</Texto>
         <Texto variante="pequeno" cor={cores.textoSuave}>
-          Versão de {dados.atualizadoEm}. Vale para os cofrinhos abertos a partir dessa data.
+          Versão de {dados.atualizadoEm}. Vale para os cofrinhos abertos a partir dessa data. Conferência {dados.hash.slice(0, 12)}.
         </Texto>
       </View>
       {dados.secoes.map((s) => (
@@ -32,6 +32,24 @@ export default function TermosCofrinho() {
           ))}
         </View>
       ))}
+      <View style={{ gap: 8 }}>
+        <Texto variante="subtitulo" accessibilityRole="header">
+          Termo de adesão
+        </Texto>
+        {dados.declaracoes.map((d, i) => (
+          <Texto key={d.id} cor={cores.textoSuave}>
+            {i + 1}. {d.texto}
+          </Texto>
+        ))}
+        <Texto cor={cores.textoSuave}>À parte, já marcada e opcional (dá para desmarcar): {dados.ofertas.texto}</Texto>
+        {dados.aceite ? <Texto cor={cores.textoSuave}>{dados.aceite}</Texto> : null}
+      </View>
+      <View style={{ gap: 8 }}>
+        <Texto variante="subtitulo" accessibilityRole="header">
+          Condições do bônus
+        </Texto>
+        <Texto cor={cores.textoSuave}>{dados.condicoesBonus.texto}</Texto>
+      </View>
     </ScrollView>
   );
 }

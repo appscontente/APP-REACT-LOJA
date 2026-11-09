@@ -125,21 +125,16 @@ export const api = {
    * Promoções e cupom iguais ao site: o servidor recalcula o carrinho (preço dele, nunca o do app) e devolve os totais.
    * Chamado a cada mudança do carrinho do site e no checkout; o pedido real recalcula de novo.
    */
-  calcularCarrinho: (itens: ItemCalculo[], contexto: ContextoCalculo = {}) =>
-    enviar<ResultadoCalculo>('/api/app/carrinho/calcular', { itens, contexto }),
+  calcularCarrinho: (itens: ItemCalculo[], contexto: ContextoCalculo = {}) => enviar<ResultadoCalculo>('/api/app/carrinho/calcular', { itens, contexto }),
   /** Orçamento do vendedor pelo token do link; 404 quando não existe. */
   orcamento: (token: string) => obter<OrcamentoApp>(`/api/app/orcamentos/${encodeURIComponent(token)}`),
   /** Acompanhar entrega sem login: número do pedido + CPF ou e-mail da compra; 404 com mensagem genérica. */
   rastrear: (numero: string, documento: string) => enviar<RastreioApp>('/api/app/rastreio', { numero, documento }),
   busca: (termo: string, ordenacao?: string) => obter<ResultadoBusca>('/api/app/busca', { q: termo, ordenacao }),
   sugestoes: (termo: string) =>
-    obter<{ produtos: { nome: string; href: string; preco: number; imagem?: string }[]; categorias: { nome: string; href: string }[] }>(
-      '/api/busca/sugestoes',
-      { q: termo },
-    ),
+    obter<{ produtos: { nome: string; href: string; preco: number; imagem?: string }[]; categorias: { nome: string; href: string }[] }>('/api/busca/sugestoes', { q: termo }),
   lojas: () => obter<LojaFisica[]>('/api/app/lojas'),
-  produtoNaLoja: (loja: string, por: { slug?: string; codprod?: string }) =>
-    obter<ProdutoFigital>(`/api/app/lojas/${encodeURIComponent(loja)}/produtos`, por),
+  produtoNaLoja: (loja: string, por: { slug?: string; codprod?: string }) => obter<ProdutoFigital>(`/api/app/lojas/${encodeURIComponent(loja)}/produtos`, por),
   expostos: (loja: string) => obter<Exposto[]>(`/api/app/lojas/${encodeURIComponent(loja)}/expostos`),
   /** Desconto do autoatendimento (Happy) de cada item em cada forma de pagamento; sem resposta, sem desconto. */
   /**
@@ -155,17 +150,14 @@ export const api = {
   /** Termos e condições do Cofrinho Contente, o mesmo texto da página /cofrinho/termos do site. */
   termosCofrinho: () => obter<TermosCofrinho>('/api/app/cofrinho/termos'),
   /** Preço à vista garantido, entrada mínima e sugestões de depósito de um produto. Só simula: o preço vale na abertura. */
-  simularCofrinho: (por: { slug?: string; codprod?: string }) => obter<SimulacaoCofrinho>('/api/app/cofrinho/simulacao', por),
-  descontos: (loja: string, codprods: string[]) =>
-    obter<{ itens: DescontoFigital[] }>(`/api/app/lojas/${encodeURIComponent(loja)}/descontos`, { itens: codprods.join(',') }),
+  simularCofrinho: (por: { slug?: string; codprod?: string; cep?: string }) => obter<SimulacaoCofrinho>('/api/app/cofrinho/simulacao', por),
+  descontos: (loja: string, codprods: string[]) => obter<{ itens: DescontoFigital[] }>(`/api/app/lojas/${encodeURIComponent(loja)}/descontos`, { itens: codprods.join(',') }),
 };
 
 /** Imagem do site com endereço completo (as rotas do app já mandam assim; isto cobre o "sem foto"). */
 export const imagemSemFoto = `${SITE_URL}/img/sem-foto.svg`;
 
-export type CotacaoFrete =
-  | { atendido: true; cotacao: { faixa: string; valor: number; prazo: string }; endereco?: EnderecoCep }
-  | { atendido: false; endereco?: EnderecoCep };
+export type CotacaoFrete = { atendido: true; cotacao: { faixa: string; valor: number; prazo: string }; endereco?: EnderecoCep } | { atendido: false; endereco?: EnderecoCep };
 
 /** Endereço do CEP (ViaCEP pelo site). CEP geral de cidade vem sem rua e sem bairro: aí o cliente digita. */
 export type EnderecoCep = { cidade: string; uf: string; bairro: string; logradouro?: string };
@@ -199,10 +191,7 @@ export type OpcaoRetirada = {
 export type ResultadoRetirada = { opcoes: OpcaoRetirada[]; sugerida?: string };
 
 /** Em qual loja retirar e quando fica pronto, com a loja sugerida (CD da empresa 7 primeiro, como no site). */
-export async function consultarRetirada(
-  itens: { codprod: string; quantidade: number }[],
-  { cep, preferida }: { cep?: string; preferida?: string } = {},
-): Promise<ResultadoRetirada> {
+export async function consultarRetirada(itens: { codprod: string; quantidade: number }[], { cep, preferida }: { cep?: string; preferida?: string } = {}): Promise<ResultadoRetirada> {
   const resposta = await buscarComLimite(`${SITE_URL}/api/app/retirada`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Canal': 'app' },
