@@ -71,7 +71,8 @@ export type Cofrinho = {
   extrato: LinhaExtrato[];
   lembrete?: Lembrete;
   /** Aceite: versão e hash do regulamento, declarações, ofertas e o hash das condições do bônus. */
-  aceite: { versao: string; hash: string; em: string; declaracoes: string[]; ofertas: boolean; hashCondicoesBonus: string };
+  /** Aceite único: uma caixa cobre o pedido, o regulamento e as declarações do termo (usuário, 09/11/2026). */
+  aceite: { versao: string; hash: string; em: string; aceitou: true; ofertas: boolean; hashCondicoesBonus: string };
   situacao: 'aberto' | 'em_falta' | 'concluido' | 'desistido' | 'devolvido' | 'credito';
   /** Produto em falta: a data combinada para esperar a reposição. */
   aguardarAte?: string;

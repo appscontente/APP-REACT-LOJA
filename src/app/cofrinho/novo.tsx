@@ -1,6 +1,6 @@
 // Abrir um Cofrinho Contente para um produto (?slug=). Regulamento v4: antes do primeiro pagamento, o pedido completo
-// (frete pelo CEP, montagem, prazos, endereço, volume e a proteção do preço), que vale até a entrega; as seis
-// declarações do termo de adesão e, à parte e desmarcada, a opção de ofertas; as condições do bônus; uma cópia do
+// (frete pelo CEP, montagem, prazos, endereço, volume e a proteção do preço), que vale até a entrega; uma caixa só de aceite
+// (pedido, regulamento e declarações do termo de adesão) e, à parte e desmarcada, a opção de ofertas; as condições do bônus; uma cópia do
 // regulamento e do pedido para guardar; e o primeiro pagamento, em até 24 horas. O preço e o frete vêm do site; com o
 // backend, o servidor calcula de novo e grava o aceite (versão, hash, pedido exibido, data, IP e aparelho).
 
@@ -36,7 +36,7 @@ export default function NovoCofrinho() {
   const [pedido, setPedido] = useState<PedidoSimulado>();
   const [cotando, setCotando] = useState(false);
   const [erroCep, setErroCep] = useState<string>();
-  const [marcadas, setMarcadas] = useState<string[]>([]);
+  const [aceitou, setAceitou] = useState(false);
   const [ofertas, setOfertas] = useState(false);
   const [querLembrete, setQuerLembrete] = useState(false);
   const [lembrete, setLembrete] = useState<Lembrete>();
@@ -92,15 +92,13 @@ export default function NovoCofrinho() {
   const endereco = pedido?.endereco
     ? [pedido.endereco.logradouro, numero.trim(), complemento.trim(), pedido.endereco.bairro, `${pedido.endereco.cidade}/${pedido.endereco.uf}`].filter(Boolean).join(', ')
     : '';
-  const todas = termos.declaracoes.every((d) => marcadas.includes(d.id));
   const falta = !pedido
     ? 'Calcule o frete pelo CEP para ver o pedido completo.'
     : !numero.trim()
       ? 'Digite o número do endereço de entrega.'
-      : !todas
-        ? 'Marque as seis declarações para abrir o cofrinho.'
+      : !aceitou
+        ? 'Marque o aceite do regulamento para abrir o cofrinho.'
         : undefined;
-  const alternar = (id: string) => setMarcadas((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]));
 
   return (
     <ScrollView contentContainerStyle={estilos.conteudo} automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
@@ -206,16 +204,16 @@ export default function NovoCofrinho() {
           <Botao titulo="Ler o regulamento" variante="texto" onPress={() => router.push('/cofrinho/termos')} />
           <Botao titulo="Guardar uma cópia" variante="texto" onPress={() => Share.share({ title: termos.titulo, message: copia(termos, nome, sim.precoGarantido, pedido, endereco, total) })} />
         </View>
-        {termos.declaracoes.map((d) => (
-          <Declaracao key={d.id} texto={d.texto} marcada={marcadas.includes(d.id)} aoTocar={() => alternar(d.id)} />
-        ))}
+        <Declaracao
+          texto={termos.aceite ?? 'Li e concordo com o pedido acima e com o Regulamento do Cofrinho Contente, incluindo as declarações do termo de adesão.'}
+          marcada={aceitou}
+          aoTocar={() => setAceitou((a) => !a)}
+        />
         <View style={{ height: 4 }} />
+        <Texto variante="pequeno" cor={cores.textoSuave}>
+          Opcional:
+        </Texto>
         <Declaracao texto={termos.ofertas.texto} marcada={ofertas} aoTocar={() => setOfertas((o) => !o)} />
-        {termos.aceite ? (
-          <Texto variante="pequeno" cor={cores.textoSuave}>
-            {termos.aceite}
-          </Texto>
-        ) : null}
         <Texto variante="pequeno" cor={cores.textoSuave}>
           Regulamento de {versao.atualizadoEm} · conferência {versao.hash.slice(0, 12)}
         </Texto>
@@ -247,7 +245,7 @@ export default function NovoCofrinho() {
             primeiroPagamentoAte: prazoPrimeiro,
             pedido: dadosPedido,
             ...(querLembrete && lembrete && { lembrete }),
-            aceite: { versao: termos.versao, hash: termos.hash, em: new Date().toISOString(), declaracoes: marcadas, ofertas, hashCondicoesBonus: termos.condicoesBonus.hash },
+            aceite: { versao: termos.versao, hash: termos.hash, em: new Date().toISOString(), aceitou: true, ofertas, hashCondicoesBonus: termos.condicoesBonus.hash },
             pagamento,
           });
           router.replace({ pathname: '/cofrinho/[id]', params: { id, novo: '1', ...(pagamento.forma === 'loja' && { caixa: '1' }) } });
