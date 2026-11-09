@@ -29,21 +29,11 @@ function Entrar({ voltar }: { voltar?: string }) {
     <View style={estilos.caixa}>
       <Texto variante="subtitulo">Entre na sua conta</Texto>
       <Texto cor={cores.textoSuave}>
-        {enviado
-          ? `Mandamos um código de 6 números para ${email}. Ele vale por 10 minutos.`
-          : 'Sem senha: mandamos um código para o seu e-mail. Suas compras pelo site e pelo app aparecem aqui.'}
+        {enviado ? `Mandamos um código de 6 números para ${email}. Ele vale por 10 minutos.` : 'Sem senha: mandamos um código para o seu e-mail. Suas compras pelo site e pelo app aparecem aqui.'}
       </Texto>
       {!enviado ? (
         <>
-          <TextInput
-            value={email}
-            onChangeText={setEmail}
-            placeholder="seu@email.com"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-            style={estilos.entrada}
-          />
+          <TextInput value={email} onChangeText={setEmail} placeholder="seu@email.com" keyboardType="email-address" autoCapitalize="none" autoComplete="email" style={estilos.entrada} />
           <Botao titulo="Receber código" disabled={!EMAIL.test(email.trim())} onPress={() => setEnviado(true)} />
         </>
       ) : (
@@ -154,13 +144,7 @@ function OpcaoBoasVindas() {
           Ao chegar numa loja, o app entra no modo dela
         </Texto>
       </View>
-      <Switch
-        value={ligado}
-        onValueChange={alternar}
-        trackColor={{ true: cores.marca, false: cores.borda }}
-        thumbColor="#fff"
-        accessibilityLabel="Boas-vindas na loja"
-      />
+      <Switch value={ligado} onValueChange={alternar} trackColor={{ true: cores.marca, false: cores.borda }} thumbColor="#fff" accessibilityLabel="Boas-vindas na loja" />
     </View>
   );
 }
@@ -171,18 +155,19 @@ export default function Conta() {
   const { logado, email, pedidos, favoritos } = useConta();
   const sair = useSairDaConta();
   const { naoLidas } = useConversas();
-  const { abertos } = useCofrinho();
+  const { ativos: abertos } = useCofrinho();
   const confirmarSaida = () =>
-    Alert.alert(
-      'Sair da conta?',
-      'Saem deste celular seus pedidos, favoritos, CEP, conversas com a loja, cofrinhos e buscas recentes. O carrinho continua.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Sair', style: 'destructive', onPress: sair },
-      ],
-    );
+    Alert.alert('Sair da conta?', 'Saem deste celular seus pedidos, favoritos, CEP, conversas com a loja, cofrinhos e buscas recentes. O carrinho continua.', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Sair', style: 'destructive', onPress: sair },
+    ]);
   return (
-    <ScrollView style={estilos.tela} contentContainerStyle={[estilos.conteudo, { paddingTop: topo + 12 }]} automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" keyboardShouldPersistTaps="handled">
+    <ScrollView
+      style={estilos.tela}
+      contentContainerStyle={[estilos.conteudo, { paddingTop: topo + 12 }]}
+      automaticallyAdjustKeyboardInsets
+      keyboardDismissMode="interactive"
+      keyboardShouldPersistTaps="handled">
       <View style={estilos.ola}>
         <Sorriso largura={44} />
         <Texto variante="titulo">{logado ? 'Olá!' : 'Minha conta'}</Texto>

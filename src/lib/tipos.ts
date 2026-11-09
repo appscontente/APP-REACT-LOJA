@@ -348,28 +348,62 @@ export type FormaDeposito = 'pix' | 'loja';
 /** Regras do Cofrinho Contente (GET /api/app/cofrinho, contrato 39.1). */
 export type RegrasCofrinho = {
   regras: {
+    /** Dias de proteção do preço, contados do primeiro pagamento (só define o aviso de preço que subiu). */
     prazoDias: number;
+    /** Horas, da abertura, para o primeiro pagamento; sem ele, o cofrinho expira sem ônus. */
+    primeiroPagamentoHoras: number;
     entradaMinimaPercentual: number;
     depositoMinimo: number;
     precoMinimo: number;
     maxAbertos: number;
-    avisosDias: number[];
+    /** Dias depois do recebimento em que ainda vale o arrependimento. */
+    arrependimentoDiasAposEntrega: number;
+    bonusCreditoPercentual: number;
+    prazoDevolucaoDiasUteis: number;
     formas: FormaDeposito[];
     nomesFormas: Record<FormaDeposito, string>;
+    opcoesFalta: { id: OpcaoFalta; titulo: string; texto: string }[];
   };
-  termos: { versao: string; atualizadoEm: string };
+  termos: { versao: string; atualizadoEm: string; hash: string };
+  /** Abertura de cofrinhos novos: desligada até o parecer jurídico (os abertos seguem). */
+  abertura: { ligada: boolean; mensagem?: string };
 };
 
-/** Termos do Cofrinho Contente (GET /api/app/cofrinho/termos), o mesmo texto da página /cofrinho/termos do site. */
-export type TermosCofrinho = { versao: string; atualizadoEm: string; titulo: string; secoes: { titulo: string; paragrafos: string[] }[] };
+/** Escolhas do cliente quando o produto do cofrinho falta (regulamento, 7). */
+export type OpcaoFalta = 'aguardar' | 'equivalente' | 'devolucao' | 'credito';
+
+/** Regulamento do Cofrinho Contente (GET /api/app/cofrinho/termos), o mesmo texto da página /cofrinho/termos do site. */
+export type TermosCofrinho = {
+  versao: string;
+  atualizadoEm: string;
+  titulo: string;
+  secoes: { titulo: string; paragrafos: string[] }[];
+  /** As seis declarações do termo de adesão: todas marcadas para abrir. */
+  declaracoes: { id: string; texto: string }[];
+  /** Receber ofertas: separada e desmarcada, não é condição para abrir. */
+  ofertas: { id: string; texto: string };
+  hash: string;
+  /** Condições do bônus de 10% (12B), mostradas antes do aceite; o hash vai no aceite. */
+  condicoesBonus: { texto: string; hash: string };
+};
+
+/** Pedido completo do cofrinho pelo CEP (regulamento, 3.2): vale até a entrega. */
+export type PedidoSimulado = {
+  cep: string;
+  frete: { valor: number; faixa: string };
+  prazoEntrega: string;
+  montagem: { incluida: boolean; valor: number; texto: string; prazo?: string };
+  endereco?: { cidade: string; uf: string; bairro: string; logradouro?: string };
+};
 
 /** Simulação do cofrinho para um produto (GET /api/app/cofrinho/simulacao). */
 export type SimulacaoCofrinho = {
   produto: CardProduto;
   elegivel: { pode: true; motivo?: undefined } | { pode: false; motivo: string };
   precoGarantido: number;
-  garantidoAte: string;
   prazoDias: number;
   entradaMinima: number;
-  sugestoes: { tipo: 'mensal' | 'quinzenal' | 'semanal'; vezes: number; valor: number; texto: string }[];
+  primeiroPagamentoAte: string;
+  volumeM3?: number;
+  pedido?: PedidoSimulado;
 };

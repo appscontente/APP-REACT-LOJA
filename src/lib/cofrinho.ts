@@ -1,5 +1,5 @@
 // Contas do Cofrinho Contente no app, iguais às do site (loja/src/lib/cofrinho/regras.ts). Os números (mínimos, prazo)
-// vêm de GET /api/app/cofrinho; o servidor confere tudo de novo em cada depósito.
+// vêm de GET /api/app/cofrinho; o servidor confere tudo de novo em cada pagamento.
 
 import { arredondar, formatarPreco } from './formatar';
 import type { RegrasCofrinho } from './tipos';
@@ -8,52 +8,50 @@ type Regras = RegrasCofrinho['regras'];
 
 const DIA = 86_400_000;
 
-/** Primeiro depósito mínimo: o % de entrada do preço, nunca menos que o depósito mínimo nem mais que o preço. */
+/** Primeiro pagamento mínimo: o % de entrada do preço, nunca menos que o depósito mínimo nem mais que o preço. */
 export function entradaMinima(preco: number, r: Regras) {
   return Math.min(arredondar(preco), Math.max(r.depositoMinimo, Math.ceil((preco * r.entradaMinimaPercentual) / 100)));
 }
 
-/** Confere o valor do depósito; devolve a frase do erro ou o valor arredondado. */
+/** Confere o valor do pagamento; devolve a frase do erro ou o valor arredondado. */
 export function conferirDeposito(valor: number, falta: number, primeiro: boolean, preco: number, r: Regras): { erro: string } | { erro?: undefined; valor: number } {
-  if (!Number.isFinite(valor) || valor <= 0) return { erro: 'Digite o valor do depósito.' };
+  if (!Number.isFinite(valor) || valor <= 0) return { erro: 'Digite quanto quer guardar.' };
   const v = arredondar(valor);
   const restante = arredondar(falta);
   if (v > restante) return { erro: `Falta só ${formatarPreco(restante)} para completar.` };
   const minimo = primeiro ? entradaMinima(preco, r) : Math.min(r.depositoMinimo, restante);
   if (v < minimo)
     return {
-      erro: primeiro
-        ? `O primeiro depósito é de pelo menos ${formatarPreco(minimo)} (${r.entradaMinimaPercentual}% do preço).`
-        : `O depósito mínimo é de ${formatarPreco(minimo)}.`,
+      erro: primeiro ? `O primeiro pagamento é de pelo menos ${formatarPreco(minimo)} (${r.entradaMinimaPercentual}% do preço).` : `O pagamento mínimo é de ${formatarPreco(minimo)}.`,
     };
   return { valor: v };
 }
 
-/** Dias da semana do pagamento semanal (0 = domingo, como Date.getDay). */
+/** Dias da semana do lembrete (0 = domingo, como Date.getDay). */
 export const DIAS_SEMANA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'] as const;
 
-/**
- * Valor por semana que completa o cofrinho até o fim da garantia (só uma sugestão: o cliente digita o que quiser). Nunca
- * menos que o depósito mínimo nem mais que o que falta.
- */
-export function valorSemanal(falta: number, garantidoAte: string, r: Regras, agora = Date.now()) {
-  if (falta <= 0) return 0;
-  const semanas = Math.max(1, Math.floor(diasAte(garantidoAte, agora) / 7) + 1);
-  return Math.min(arredondar(falta), Math.max(r.depositoMinimo, Math.ceil(falta / semanas)));
-}
+const HORA = 3_600_000;
 
-/** Próximo dia da semana escolhido, às 9h, depois de `agora` (o Pix de hoje já sai na hora em que o plano começa). */
-export function proximaSemana(diaSemana: number, agora = Date.now()) {
-  const d = new Date(agora);
-  d.setHours(9, 0, 0, 0);
-  const dias = (diaSemana - d.getDay() + 7) % 7 || 7;
-  d.setDate(d.getDate() + dias);
-  return d.toISOString();
-}
+/** Até quando o primeiro pagamento pode ser feito: abertura + 24 horas (o Pix do primeiro pagamento vence aí). */
+export const primeiroPagamentoAte = (abertura: string, r: Regras) => new Date(new Date(abertura).getTime() + r.primeiroPagamentoHoras * HORA).toISOString();
 
-/** Troca por escolha mantém o prazo; troca porque o produto esgotou recomeça a garantia. */
-export const garantiaDaTroca = (motivo: 'escolha' | 'esgotado', atual: string, r: Regras, agora = Date.now()) =>
-  motivo === 'esgotado' ? new Date(agora + r.prazoDias * DIA).toISOString() : atual;
+/** Fim da proteção do preço (os avisos de alta), contada do primeiro pagamento. */
+export const protegidoAte = (primeiroPagamento: string, r: Regras) => new Date(new Date(primeiroPagamento).getTime() + r.prazoDias * DIA).toISOString();
+
+/** O preço do cofrinho nunca sobe: fica com o menor entre o atual e o à vista do dia (a redução não volta). */
+export const precoDoCofrinho = (atual: number, avistaHoje: number) => arredondar(Math.min(atual, avistaHoje));
+
+/** Desconto do cofrinho: quanto o à vista do dia passa do preço do cofrinho. */
+export const descontoDoCofrinho = (precoCofrinho: number, avistaHoje: number) => arredondar(Math.max(0, avistaHoje - precoCofrinho));
+
+/** Arrependimento: sempre antes do recebimento; até 7 dias depois dele. */
+export const dentroDoArrependimento = (recebidoEm: string | undefined, r: Regras, agora = Date.now()) => !recebidoEm || agora <= new Date(recebidoEm).getTime() + r.arrependimentoDiasAposEntrega * DIA;
+
+/** Crédito com bônus na falta do produto: principal e bônus separados. */
+export const creditoComBonus = (principal: number, r: Regras) => ({ principal: arredondar(principal), bonus: arredondar((principal * r.bonusCreditoPercentual) / 100) });
+
+/** Protocolo mostrado na hora (arrependimento, devolução, crédito). Com o backend, quem numera é o Happy. */
+export const novoProtocolo = (agora = Date.now()) => `CC${new Date(agora).toISOString().slice(0, 10).replace(/-/g, '')}${String(agora % 100000).padStart(5, '0')}`;
 
 /** Dias que faltam até a data (0 no dia; negativo depois). */
 export const diasAte = (iso: string, agora = Date.now()) => Math.ceil((new Date(iso).getTime() - agora) / DIA);

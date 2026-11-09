@@ -74,34 +74,35 @@ export default function Raiz() {
                 <ProvedorCarrinho>
                   <ProvedorConversas>
                     <ProvedorCofrinho>
-                    <View style={{ flex: 1 }}>
-                      {/* Texto escuro na barra de status; o Início (topo vermelho), o leitor e o pedido recebido trocam para claro. */}
-                      <StatusBar style="dark" />
-                      {/* Cada tela tem a própria barreira de erro: um erro numa tela não troca o app inteiro. */}
-                      <Stack
-                        unstable_screenErrorBoundary={ErrorBoundary}
-                        screenOptions={{
-                          title: '',
-                          headerTintColor: cores.texto,
-                          headerTitleStyle: { fontFamily: fontes.titulo, fontSize: 18 },
-                          headerBackButtonDisplayMode: 'minimal',
-                          headerShadowVisible: false,
-                          headerStyle: { backgroundColor: cores.fundo },
-                          contentStyle: { backgroundColor: cores.fundo },
-                        }}>
-                        <Stack.Screen name="(abas)" options={{ headerShown: false }} />
-                        <Stack.Screen name="leitor" options={{ presentation: 'fullScreenModal', headerShown: false }} />
-                        <Stack.Screen name="checkout" options={{ title: 'Finalizar compra' }} />
-                        <Stack.Screen name="pedido-recebido" options={{ headerShown: false, gestureEnabled: false }} />
-                        <Stack.Screen name="[segmento]/p" options={{ title: '' }} />
-                        <Stack.Screen name="cofrinho/index" options={{ title: 'Cofrinho Contente' }} />
-                        <Stack.Screen name="cofrinho/novo" options={{ title: 'Novo cofrinho' }} />
-                        <Stack.Screen name="cofrinho/termos" options={{ title: 'Termos do cofrinho' }} />
-                        <Stack.Screen name="cofrinho/[id]/depositar" options={{ title: 'Depositar' }} />
-                        <Stack.Screen name="cofrinho/[id]/trocar" options={{ title: 'Trocar produto' }} />
-                      </Stack>
-                      <BotaoFigital />
-                    </View>
+                      <View style={{ flex: 1 }}>
+                        {/* Texto escuro na barra de status; o Início (topo vermelho), o leitor e o pedido recebido trocam para claro. */}
+                        <StatusBar style="dark" />
+                        {/* Cada tela tem a própria barreira de erro: um erro numa tela não troca o app inteiro. */}
+                        <Stack
+                          unstable_screenErrorBoundary={ErrorBoundary}
+                          screenOptions={{
+                            title: '',
+                            headerTintColor: cores.texto,
+                            headerTitleStyle: { fontFamily: fontes.titulo, fontSize: 18 },
+                            headerBackButtonDisplayMode: 'minimal',
+                            headerShadowVisible: false,
+                            headerStyle: { backgroundColor: cores.fundo },
+                            contentStyle: { backgroundColor: cores.fundo },
+                          }}>
+                          <Stack.Screen name="(abas)" options={{ headerShown: false }} />
+                          <Stack.Screen name="leitor" options={{ presentation: 'fullScreenModal', headerShown: false }} />
+                          <Stack.Screen name="checkout" options={{ title: 'Finalizar compra' }} />
+                          <Stack.Screen name="pedido-recebido" options={{ headerShown: false, gestureEnabled: false }} />
+                          <Stack.Screen name="[segmento]/p" options={{ title: '' }} />
+                          <Stack.Screen name="cofrinho/index" options={{ title: 'Cofrinho Contente' }} />
+                          <Stack.Screen name="cofrinho/novo" options={{ title: 'Novo cofrinho' }} />
+                          <Stack.Screen name="cofrinho/termos" options={{ title: 'Regulamento do cofrinho' }} />
+                          <Stack.Screen name="cofrinho/[id]/depositar" options={{ title: 'Guardar' }} />
+                          <Stack.Screen name="cofrinho/[id]/trocar" options={{ title: 'Trocar produto' }} />
+                          <Stack.Screen name="cofrinho/[id]/sobra" options={{ title: 'Destino da sobra' }} />
+                        </Stack>
+                        <BotaoFigital />
+                      </View>
                     </ProvedorCofrinho>
                   </ProvedorConversas>
                 </ProvedorCarrinho>
