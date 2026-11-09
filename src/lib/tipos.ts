@@ -382,7 +382,7 @@ export type TermosCofrinho = {
   secoes: { titulo: string; paragrafos: string[] }[];
   /** As seis declarações do termo de adesão: todas marcadas para abrir. */
   declaracoes: { id: string; texto: string }[];
-  /** Receber ofertas: separada e desmarcada, não é condição para abrir. */
+  /** Receber ofertas: separada, já marcada e opcional; não é condição para abrir. */
   ofertas: { id: string; texto: string };
   /** Aceite do contrato, mostrado junto das declarações (entra no hash). */
   aceite?: string;

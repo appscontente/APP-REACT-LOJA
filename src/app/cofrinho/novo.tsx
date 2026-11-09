@@ -1,6 +1,6 @@
 // Abrir um Cofrinho Contente para um produto (?slug=). Regulamento v4: antes do primeiro pagamento, o pedido completo
 // (frete pelo CEP, montagem, prazos, endereço, volume e a proteção do preço), que vale até a entrega; uma caixa só de aceite
-// (pedido, regulamento e declarações do termo de adesão) e, à parte e desmarcada, a opção de ofertas; as condições do bônus; uma cópia do
+// (pedido, regulamento e declarações do termo de adesão) e, à parte e já marcada (o cliente pode desmarcar), a opção de ofertas; as condições do bônus; uma cópia do
 // regulamento e do pedido para guardar; e o primeiro pagamento, em até 24 horas. O preço e o frete vêm do site; com o
 // backend, o servidor calcula de novo e grava o aceite (versão, hash, pedido exibido, data, IP e aparelho).
 
@@ -37,7 +37,8 @@ export default function NovoCofrinho() {
   const [cotando, setCotando] = useState(false);
   const [erroCep, setErroCep] = useState<string>();
   const [aceitou, setAceitou] = useState(false);
-  const [ofertas, setOfertas] = useState(false);
+  // Já vem marcada (usuário, 09/11/2026); o cliente pode desmarcar.
+  const [ofertas, setOfertas] = useState(true);
   const [querLembrete, setQuerLembrete] = useState(false);
   const [lembrete, setLembrete] = useState<Lembrete>();
   const { dados, erro, carregando, recarregar } = useDados(() => Promise.all([api.regrasCofrinho(), api.termosCofrinho(), api.simularCofrinho({ slug: slug ?? '' })]), [slug]);

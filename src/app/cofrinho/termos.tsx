@@ -41,7 +41,7 @@ export default function TermosCofrinho() {
             {i + 1}. {d.texto}
           </Texto>
         ))}
-        <Texto cor={cores.textoSuave}>À parte, e desmarcada de início: {dados.ofertas.texto}</Texto>
+        <Texto cor={cores.textoSuave}>À parte, já marcada e opcional (dá para desmarcar): {dados.ofertas.texto}</Texto>
         {dados.aceite ? <Texto cor={cores.textoSuave}>{dados.aceite}</Texto> : null}
       </View>
       <View style={{ gap: 8 }}>
