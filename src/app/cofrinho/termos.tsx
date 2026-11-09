@@ -42,6 +42,7 @@ export default function TermosCofrinho() {
           </Texto>
         ))}
         <Texto cor={cores.textoSuave}>À parte, e desmarcada de início: {dados.ofertas.texto}</Texto>
+        {dados.aceite ? <Texto cor={cores.textoSuave}>{dados.aceite}</Texto> : null}
       </View>
       <View style={{ gap: 8 }}>
         <Texto variante="subtitulo" accessibilityRole="header">

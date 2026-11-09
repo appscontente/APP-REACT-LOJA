@@ -360,6 +360,8 @@ export type RegrasCofrinho = {
     arrependimentoDiasAposEntrega: number;
     bonusCreditoPercentual: number;
     prazoDevolucaoDiasUteis: number;
+    /** Compensação fixa na desistência depois da quitação e antes da entrega, só no médio porte (regulamento, 10). */
+    compensacao?: { valor: number; volumeMinM3: number; volumeMaxM3: number };
     formas: FormaDeposito[];
     nomesFormas: Record<FormaDeposito, string>;
     opcoesFalta: { id: OpcaoFalta; titulo: string; texto: string }[];
@@ -382,6 +384,8 @@ export type TermosCofrinho = {
   declaracoes: { id: string; texto: string }[];
   /** Receber ofertas: separada e desmarcada, não é condição para abrir. */
   ofertas: { id: string; texto: string };
+  /** Aceite do contrato, mostrado junto das declarações (entra no hash). */
+  aceite?: string;
   hash: string;
   /** Condições do bônus de 10% (12B), mostradas antes do aceite; o hash vai no aceite. */
   condicoesBonus: { texto: string; hash: string };

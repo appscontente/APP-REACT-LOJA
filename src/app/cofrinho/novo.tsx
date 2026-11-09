@@ -19,7 +19,7 @@ import { Texto } from '@/componentes/texto';
 import { useCofrinho, type Lembrete, type PedidoCofrinho } from '@/estado/cofrinho';
 import { useConta } from '@/estado/conta';
 import { api, ErroApi } from '@/lib/api';
-import { DIAS_SEMANA, formatarData, primeiroPagamentoAte, protegidoAte } from '@/lib/cofrinho';
+import { categoriaVolume, DIAS_SEMANA, formatarData, primeiroPagamentoAte, protegidoAte } from '@/lib/cofrinho';
 import { arredondar, formatarCep, formatarDataHora, formatarPreco, nomeLegivel } from '@/lib/formatar';
 import { cores, raio } from '@/lib/tema';
 import type { PedidoSimulado, SimulacaoCofrinho, TermosCofrinho } from '@/lib/tipos';
@@ -153,7 +153,18 @@ export default function NovoCofrinho() {
         ) : null}
       </View>
 
-      {pedido ? <ResumoPedido sim={sim} pedido={pedido} total={total} endereco={endereco} protegido={protecaoSePagarHoje} prazoPrimeiro={prazoPrimeiro} prazoDias={regras.prazoDias} /> : null}
+      {pedido ? (
+        <ResumoPedido
+          sim={sim}
+          pedido={pedido}
+          total={total}
+          endereco={endereco}
+          protegido={protecaoSePagarHoje}
+          prazoPrimeiro={prazoPrimeiro}
+          prazoDias={regras.prazoDias}
+          compensacao={regras.compensacao}
+        />
+      ) : null}
 
       <View style={estilos.regras}>
         <Linha
@@ -200,6 +211,11 @@ export default function NovoCofrinho() {
         ))}
         <View style={{ height: 4 }} />
         <Declaracao texto={termos.ofertas.texto} marcada={ofertas} aoTocar={() => setOfertas((o) => !o)} />
+        {termos.aceite ? (
+          <Texto variante="pequeno" cor={cores.textoSuave}>
+            {termos.aceite}
+          </Texto>
+        ) : null}
         <Texto variante="pequeno" cor={cores.textoSuave}>
           Regulamento de {versao.atualizadoEm} · conferência {versao.hash.slice(0, 12)}
         </Texto>
@@ -249,7 +265,9 @@ function ResumoPedido({
   protegido,
   prazoPrimeiro,
   prazoDias,
+  compensacao,
 }: {
+  compensacao?: { valor: number; volumeMinM3: number; volumeMaxM3: number };
   sim: SimulacaoCofrinho;
   pedido: PedidoSimulado;
   total: number;
@@ -261,6 +279,8 @@ function ResumoPedido({
   return (
     <View style={estilos.resumo} accessibilityLabel="Pedido do cofrinho">
       <Texto variante="subtitulo">Seu pedido</Texto>
+      <Item rotulo="Canal" valor="Aplicativo" />
+      <Item rotulo="Quantidade" valor="1" />
       <Item rotulo="Produto" valor={formatarPreco(sim.precoGarantido)} />
       <Item rotulo="Frete" valor={pedido.frete.valor > 0 ? formatarPreco(pedido.frete.valor) : 'Grátis'} />
       <Item rotulo="Montagem" valor={pedido.montagem.valor > 0 ? formatarPreco(pedido.montagem.valor) : pedido.montagem.texto} />
@@ -273,11 +293,15 @@ function ResumoPedido({
       <Item rotulo="Entrega" valor={pedido.prazoEntrega} />
       {pedido.montagem.prazo ? <Item rotulo="Prazo de montagem" valor={pedido.montagem.prazo} /> : null}
       <Item rotulo="Endereço" valor={endereco || 'Digite o número'} />
-      {sim.volumeM3 ? <Item rotulo="Volume embalado" valor={`${sim.volumeM3.toLocaleString('pt-BR')} m³`} /> : null}
+      {sim.volumeM3 ? <Item rotulo="Volume embalado" valor={`${sim.volumeM3.toLocaleString('pt-BR')} m³ (${categoriaVolume(sim.volumeM3, compensacao)})`} /> : null}
+      <Item rotulo="Disponibilidade" valor="Sem separação de estoque" />
       <Item rotulo="Primeiro pagamento até" valor={formatarDataHora(prazoPrimeiro)} />
       <Item rotulo="Proteção do preço" valor={`${prazoDias} dias do primeiro pagamento (até ${formatarData(protegido)}, se pagar hoje)`} />
       <Texto variante="pequeno" cor={cores.textoSuave}>
         Estes valores e prazos valem até a entrega: não mudam depois.
+        {compensacao && categoriaVolume(sim.volumeM3, compensacao) === 'Médio porte'
+          ? ` Se você desistir depois de quitar e antes da entrega, fica uma compensação fixa de ${formatarPreco(compensacao.valor)} (seção 10); no arrependimento e na falta do produto, a devolução é integral.`
+          : ' Fora do médio porte (1 a 2 m³), a desistência devolve tudo, sem compensação.'}
       </Texto>
     </View>
   );
@@ -303,6 +327,7 @@ function copia(t: TermosCofrinho, nome: string, preco: number, pedido: PedidoSim
     '',
     'Termo de adesão',
     ...t.declaracoes.map((d, i) => `${i + 1}. ${d.texto}`),
+    ...(t.aceite ? ['', t.aceite] : []),
   ];
   return linhas.join('\n');
 }
