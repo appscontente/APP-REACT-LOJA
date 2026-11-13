@@ -360,8 +360,8 @@ export type RegrasCofrinho = {
     arrependimentoDiasAposEntrega: number;
     bonusCreditoPercentual: number;
     prazoDevolucaoDiasUteis: number;
-    /** Compensação fixa na desistência depois da quitação e antes da entrega, só no médio porte (regulamento, 10). */
-    compensacao?: { valor: number; volumeMinM3: number; volumeMaxM3: number };
+    /** Compensação na desistência depois da quitação e antes da entrega: % do valor pago (regulamento, 10). */
+    compensacao?: { percentual: number };
     formas: FormaDeposito[];
     nomesFormas: Record<FormaDeposito, string>;
     opcoesFalta: { id: OpcaoFalta; titulo: string; texto: string }[];

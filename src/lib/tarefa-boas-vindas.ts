@@ -42,33 +42,30 @@ export const idAviso = (slug: string) => `boas-vindas-${slug}`;
 
 // Aviso do celular com o app fechado. Fica no nível do arquivo porque o celular acorda o app só para rodar a tarefa.
 if (temSegundoPlano) {
-  TaskManager.defineTask<{ eventType: Location.GeofencingEventType; region: Location.LocationRegion }>(
-    TAREFA,
-    async ({ data, error }) => {
-      if (error || !data?.region.identifier) return;
-      const slug = data.region.identifier;
-      if (data.eventType === Location.GeofencingEventType.Enter) {
-        if (await jaSaudou(slug)) return;
-        const lojas = await ler<LojaNoMapa[]>(CHAVE_LOJAS, []);
-        const nome = lojas.find((l) => l.slug === slug)?.nome ?? '';
-        await Notifications.scheduleNotificationAsync({
-          identifier: idAviso(slug),
-          content: {
-            title: `Bem-vindo à Casa Contente ${nome}!`,
-            body: 'Toque para ver os produtos desta loja e comprar pelo celular.',
-            data: { loja: slug },
-          },
-          trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: PERMANENCIA_MS / 1000 },
-        });
-        // Conta como saudada já agora; se a pessoa sair antes dos 2 minutos, desfaz.
-        await marcarSaudada(slug, Date.now() + PERMANENCIA_MS);
-      } else if (data.eventType === Location.GeofencingEventType.Exit) {
-        const agendado = await ler<Record<string, number>>(CHAVE_SAUDADAS, {});
-        if ((agendado[slug] ?? 0) > Date.now()) {
-          await Notifications.cancelScheduledNotificationAsync(idAviso(slug));
-          await marcarSaudada(slug, null);
-        }
+  TaskManager.defineTask<{ eventType: Location.GeofencingEventType; region: Location.LocationRegion }>(TAREFA, async ({ data, error }) => {
+    if (error || !data?.region.identifier) return;
+    const slug = data.region.identifier;
+    if (data.eventType === Location.GeofencingEventType.Enter) {
+      if (await jaSaudou(slug)) return;
+      const lojas = await ler<LojaNoMapa[]>(CHAVE_LOJAS, []);
+      const nome = lojas.find((l) => l.slug === slug)?.nome ?? '';
+      await Notifications.scheduleNotificationAsync({
+        identifier: idAviso(slug),
+        content: {
+          title: `Bem-vindo à Casa Contente ${nome}!`,
+          body: 'Toque para ver os produtos desta loja e comprar pelo celular.',
+          data: { loja: slug },
+        },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: PERMANENCIA_MS / 1000 },
+      });
+      // Conta como saudada já agora; se a pessoa sair antes dos 2 minutos, desfaz.
+      await marcarSaudada(slug, Date.now() + PERMANENCIA_MS);
+    } else if (data.eventType === Location.GeofencingEventType.Exit) {
+      const agendado = await ler<Record<string, number>>(CHAVE_SAUDADAS, {});
+      if ((agendado[slug] ?? 0) > Date.now()) {
+        await Notifications.cancelScheduledNotificationAsync(idAviso(slug));
+        await marcarSaudada(slug, null);
       }
-    },
-  );
+    }
+  });
 }

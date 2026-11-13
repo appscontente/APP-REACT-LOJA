@@ -32,5 +32,4 @@ export function pagamentoFigitalDe(forma: 'pix' | 'cartao', parcelas = 1): Pagam
 }
 
 /** Maior % da tabela para um item (para dizer "até X% conforme o pagamento"). */
-export const maiorDesconto = (tabela: DescontoFigital | undefined, coluna: ColunaDesconto) =>
-  tabela ? Math.max(0, ...Object.values(tabela.descontos).map((d) => d[coluna])) : 0;
+export const maiorDesconto = (tabela: DescontoFigital | undefined, coluna: ColunaDesconto) => (tabela ? Math.max(0, ...Object.values(tabela.descontos).map((d) => d[coluna])) : 0);

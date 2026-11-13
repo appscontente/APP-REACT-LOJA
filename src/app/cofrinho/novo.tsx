@@ -19,7 +19,7 @@ import { Texto } from '@/componentes/texto';
 import { useCofrinho, type Lembrete, type PedidoCofrinho } from '@/estado/cofrinho';
 import { useConta } from '@/estado/conta';
 import { api, ErroApi } from '@/lib/api';
-import { categoriaVolume, DIAS_SEMANA, formatarData, primeiroPagamentoAte, protegidoAte } from '@/lib/cofrinho';
+import { DIAS_SEMANA, formatarData, primeiroPagamentoAte, protegidoAte } from '@/lib/cofrinho';
 import { arredondar, formatarCep, formatarDataHora, formatarPreco, nomeLegivel } from '@/lib/formatar';
 import { cores, raio } from '@/lib/tema';
 import type { PedidoSimulado, SimulacaoCofrinho, TermosCofrinho } from '@/lib/tipos';
@@ -266,7 +266,7 @@ function ResumoPedido({
   prazoDias,
   compensacao,
 }: {
-  compensacao?: { valor: number; volumeMinM3: number; volumeMaxM3: number };
+  compensacao?: { percentual: number };
   sim: SimulacaoCofrinho;
   pedido: PedidoSimulado;
   total: number;
@@ -292,15 +292,15 @@ function ResumoPedido({
       <Item rotulo="Entrega" valor={pedido.prazoEntrega} />
       {pedido.montagem.prazo ? <Item rotulo="Prazo de montagem" valor={pedido.montagem.prazo} /> : null}
       <Item rotulo="Endereço" valor={endereco || 'Digite o número'} />
-      {sim.volumeM3 ? <Item rotulo="Volume embalado" valor={`${sim.volumeM3.toLocaleString('pt-BR')} m³ (${categoriaVolume(sim.volumeM3, compensacao)})`} /> : null}
+      {sim.volumeM3 ? <Item rotulo="Volume embalado" valor={`${sim.volumeM3.toLocaleString('pt-BR')} m³`} /> : null}
       <Item rotulo="Disponibilidade" valor="Sem separação de estoque" />
       <Item rotulo="Primeiro pagamento até" valor={formatarDataHora(prazoPrimeiro)} />
       <Item rotulo="Proteção do preço" valor={`${prazoDias} dias do primeiro pagamento (até ${formatarData(protegido)}, se pagar hoje)`} />
       <Texto variante="pequeno" cor={cores.textoSuave}>
         Estes valores e prazos valem até a entrega: não mudam depois.
-        {compensacao && categoriaVolume(sim.volumeM3, compensacao) === 'Médio porte'
-          ? ` Se você desistir depois de quitar e antes da entrega, fica uma compensação fixa de ${formatarPreco(compensacao.valor)} (seção 10); no arrependimento e na falta do produto, a devolução é integral.`
-          : ' Fora do médio porte (1 a 2 m³), a desistência devolve tudo, sem compensação.'}
+        {compensacao
+          ? ` Se você desistir depois de quitar e antes da entrega, fica uma compensação de ${compensacao.percentual}% do valor pago (seção 10); no arrependimento e na falta do produto, a devolução é integral.`
+          : ''}
       </Texto>
     </View>
   );
