@@ -7,8 +7,7 @@ import { api } from './api';
 import type { PreviaCashback } from './tipos';
 
 /** Só os itens que o Happy conhece (código numérico, valor positivo), como a rota do site filtra. */
-const validos = (itens: { codprod: string; total: number }[]) =>
-  itens.filter((i) => /^\d{1,12}$/.test(i.codprod) && Number.isFinite(i.total) && i.total > 0).slice(0, 300);
+const validos = (itens: { codprod: string; total: number }[]) => itens.filter((i) => /^\d{1,12}$/.test(i.codprod) && Number.isFinite(i.total) && i.total > 0).slice(0, 300);
 
 /** Prévia do cashback dos itens; espera o carrinho parar de mudar (300 ms) antes de perguntar ao site. */
 export function usePreviaCashback(itens: { codprod: string; total: number }[]): PreviaCashback {

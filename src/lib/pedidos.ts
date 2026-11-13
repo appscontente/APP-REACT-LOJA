@@ -69,14 +69,7 @@ export function textoMontagem(p: PedidoRastreio): string | undefined {
 /** Equipe em rota (Happy Service): "Saiu para entrega: chegada prevista às 14:30 (2 paradas antes)". */
 export function textoACaminho(a: NonNullable<PedidoRastreio['aCaminho']>) {
   const quem = a.tipo === 'entrega' ? 'Saiu para entrega' : 'Montador a caminho';
-  const paradas =
-    a.paradasAntes === undefined
-      ? ''
-      : a.paradasAntes === 0
-        ? ' (você é a próxima parada)'
-        : a.paradasAntes === 1
-          ? ' (1 parada antes)'
-          : ` (${a.paradasAntes} paradas antes)`;
+  const paradas = a.paradasAntes === undefined ? '' : a.paradasAntes === 0 ? ' (você é a próxima parada)' : a.paradasAntes === 1 ? ' (1 parada antes)' : ` (${a.paradasAntes} paradas antes)`;
   return `${quem}: chegada prevista às ${formatarHora(a.chegadaPrevista)}${paradas}`;
 }
 
