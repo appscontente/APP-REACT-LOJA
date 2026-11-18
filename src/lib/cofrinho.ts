@@ -65,9 +65,3 @@ export function lerReais(texto: string) {
 
 const data = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'long', timeZone: 'America/Belem' });
 export const formatarData = (iso: string) => data.format(new Date(iso));
-
-/** Categoria de volume do pedido (regulamento, 10): médio porte de 1 a 2 m³ inclusive, o único com compensação. */
-export function categoriaVolume(m3: number | undefined, c: { volumeMinM3: number; volumeMaxM3: number } = { volumeMinM3: 1, volumeMaxM3: 2 }) {
-  if (m3 === undefined) return undefined;
-  return m3 >= c.volumeMinM3 && m3 <= c.volumeMaxM3 ? 'Médio porte' : 'Outro porte';
-}

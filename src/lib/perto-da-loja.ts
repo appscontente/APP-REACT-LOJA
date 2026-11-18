@@ -94,8 +94,7 @@ export async function limparBoasVindas() {
   const lojas = await ler<LojaNoMapa[]>(CHAVE_LOJAS, []);
   const saudadas = await ler<Record<string, number>>(CHAVE_SAUDADAS, {});
   const slugs = new Set([...lojas.map((l) => l.slug), ...Object.keys(saudadas)]);
-  if (Platform.OS !== 'web')
-    await Promise.all([...slugs].map((slug) => Notifications.cancelScheduledNotificationAsync(idAviso(slug)).catch(() => undefined)));
+  if (Platform.OS !== 'web') await Promise.all([...slugs].map((slug) => Notifications.cancelScheduledNotificationAsync(idAviso(slug)).catch(() => undefined)));
   await gravar(CHAVE_SAUDADAS, {});
   await gravar(CHAVE_LOJAS, []);
 }

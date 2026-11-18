@@ -70,7 +70,11 @@ export function cpfValido(cpf: string) {
 }
 
 /** Nome e sobrenome (pelo menos duas palavras com 2 letras ou mais), como o checkout do site pede. */
-export const nomeCompleto = (nome: string) => nome.trim().split(/\s+/).filter((p) => p.length >= 2).length >= 2;
+export const nomeCompleto = (nome: string) =>
+  nome
+    .trim()
+    .split(/\s+/)
+    .filter((p) => p.length >= 2).length >= 2;
 
 /** CPF com a máscara 000.000.000-00 enquanto o cliente digita (guarde só os dígitos). */
 export const formatarCpf = (cpf: string) => {

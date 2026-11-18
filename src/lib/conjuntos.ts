@@ -39,8 +39,7 @@ export function calcularConjunto(c: ConjuntoCompleto, escolhas: EscolhaConjunto[
     const doSlot = escolhas.filter((e) => e.slot === slot.id && e.quantidade > 0);
     const quantidade = doSlot.reduce((s, e) => s + e.quantidade, 0);
     if (doSlot.length > 1) erros.push(`Escolha só uma opção em "${slot.nome}".`);
-    if (quantidade < slot.quantidadeMin)
-      erros.push(slot.quantidadeMin === 1 ? `Escolha ${slot.nome.toLowerCase()}.` : `${slot.nome}: mínimo ${slot.quantidadeMin}.`);
+    if (quantidade < slot.quantidadeMin) erros.push(slot.quantidadeMin === 1 ? `Escolha ${slot.nome.toLowerCase()}.` : `${slot.nome}: mínimo ${slot.quantidadeMin}.`);
     if (quantidade > slot.quantidadeMax) erros.push(`${slot.nome}: máximo ${slot.quantidadeMax}.`);
     for (const e of doSlot) {
       const produto = c.componentes[e.codprod];
@@ -73,11 +72,9 @@ export function calcularConjunto(c: ConjuntoCompleto, escolhas: EscolhaConjunto[
 
 /** Escolhas de uma combinação pronta (a primeira é a padrão); sem presets, a primeira opção de cada slot no mínimo. */
 export const escolhasDoPreset = (c: ConjuntoCompleto, presetId?: string): EscolhaConjunto[] =>
-  (c.presets.find((p) => p.id === presetId) ?? c.presets[0])?.escolhas.map((e) => ({ ...e })) ??
-  c.slots.map((s) => ({ slot: s.id, codprod: s.opcoes[0], quantidade: s.quantidadeMin }));
+  (c.presets.find((p) => p.id === presetId) ?? c.presets[0])?.escolhas.map((e) => ({ ...e })) ?? c.slots.map((s) => ({ slot: s.id, codprod: s.opcoes[0], quantidade: s.quantidadeMin }));
 
-const chaveEscolhas = (lista: EscolhaConjunto[]) =>
-  [...lista.filter((e) => e.quantidade > 0).map((e) => `${e.slot}:${e.codprod}:${e.quantidade}`)].sort().join('|');
+const chaveEscolhas = (lista: EscolhaConjunto[]) => [...lista.filter((e) => e.quantidade > 0).map((e) => `${e.slot}:${e.codprod}:${e.quantidade}`)].sort().join('|');
 
 /** Combinação pronta que bate exatamente com as escolhas (para destacar o botão), se houver. */
 export function presetDasEscolhas(c: ConjuntoCompleto, escolhas: EscolhaConjunto[]) {
@@ -164,5 +161,4 @@ export const itensParaCalculo = (itens: ItemCarrinho[]): ItemCalculo[] =>
   }));
 
 /** Nome das peças para mostrar embaixo da linha do conjunto: "1 mesa, 4 cadeiras". */
-export const resumoPecas = (escolhas: { nome: string; quantidade: number }[]) =>
-  escolhas.map((e) => `${e.quantidade} × ${e.nome}`).join(' · ');
+export const resumoPecas = (escolhas: { nome: string; quantidade: number }[]) => escolhas.map((e) => `${e.quantidade} × ${e.nome}`).join(' · ');
