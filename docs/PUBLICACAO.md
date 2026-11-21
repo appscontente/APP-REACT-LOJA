@@ -68,9 +68,10 @@ O arquivo `eas.json` deste repositório já tem três perfis:
 | `preview` | testar nos celulares da equipe antes da loja | APK no Android (instala direto); no iPhone, distribuição interna (precisa da conta Apple e dos aparelhos cadastrados) |
 | `production` | o que vai para as lojas | AAB para o Google Play e IPA para a App Store; número de versão sobe sozinho a cada build (`autoIncrement`) |
 
-Nos três perfis o app lê o site em `https://loja-casacontente.onrender.com`. Quando o domínio casacontente.com.br sair
-da VTEX e passar para o site novo, trocar `EXPO_PUBLIC_SITE_URL` nos três perfis para `https://www.casacontente.com.br`
-e gerar um build novo (essa variável entra no aplicativo na hora do build). Os links dos dois endereços já abrem no app.
+Nos três perfis o app lê o site em `https://www.casacontente.com.br` (desde 21/11/2026, quando o domínio saiu da VTEX
+e o endereço `loja-casacontente.onrender.com` foi desligado). Essa variável entra no aplicativo na hora do build: um
+app gerado antes disso precisa de build novo (ou de um EAS Update) para voltar a carregar. Os links dos dois endereços
+continuam abrindo no app (etiquetas e cartazes impressos com o endereço antigo).
 
 ## 3. Primeiro build de teste: Android (pode ser feito hoje)
 
@@ -169,12 +170,12 @@ de varejo).
 
 **Contato**: e-mail faleconosco@casacontente.com.br; telefone (91) 3222-4751; site https://www.casacontente.com.br.
 
-**Política de privacidade (obrigatória nas duas lojas)**: https://loja-casacontente.onrender.com/politica-de-privacidade
+**Política de privacidade (obrigatória nas duas lojas)**: https://www.casacontente.com.br/politica-de-privacidade
 (trocar para https://www.casacontente.com.br/politica-de-privacidade quando o domínio mudar). A política já tem a
 seção "App Casa Contente".
 
 **Exclusão de conta (obrigatória no Google Play, pedida pela Apple)**: dentro do app, Conta → Privacidade → "Excluir
-minha conta"; pelo site, https://loja-casacontente.onrender.com/minha-conta/dados.
+minha conta"; pelo site, https://www.casacontente.com.br/minha-conta/dados.
 
 **Imagens**:
 
@@ -327,7 +328,7 @@ Texto para colar no campo de notas (em inglês, com a versão em português abai
 > sample orders; it cannot place real orders or payments). Browsing, cart and the store mode do not require sign-in.
 >
 > STORE MODE (no need to be in Brazil): tap the fixed "Na loja" button → "Escolher a loja" → pick "Doca". You can also
-> open this link on the device, which is what a shelf QR tag opens: https://loja-casacontente.onrender.com/loja/doca
+> open this link on the device, which is what a shelf QR tag opens: https://www.casacontente.com.br/loja/doca
 >
 > LOCATION "ALWAYS" (iOS) / BACKGROUND LOCATION (Android): used only by the optional "Boas-vindas na loja" feature
 > (Account tab, off by default). A geofence around our 4 stores detects that the user stayed 2 minutes inside a store

@@ -27,7 +27,7 @@ import type {
   TermosCofrinho,
 } from './tipos';
 
-export const SITE_URL = (process.env.EXPO_PUBLIC_SITE_URL ?? 'https://loja-casacontente.onrender.com').replace(/\/$/, '');
+export const SITE_URL = (process.env.EXPO_PUBLIC_SITE_URL ?? 'https://www.casacontente.com.br').replace(/\/$/, '');
 
 export class ErroApi extends Error {
   constructor(
